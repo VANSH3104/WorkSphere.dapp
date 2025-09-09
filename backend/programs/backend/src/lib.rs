@@ -1,90 +1,32 @@
 use anchor_lang::prelude::*;
+pub mod state;
+pub mod contexts;
+pub mod error;
+
+use state::*;
+use contexts::*;
+use error::ErrorCode;
 
 declare_id!("DuCPxi74kZ5FiF1koqBCXNZbW1uNGfioEnJdb6syKcB8");
-#[account]
-pub struct User{
-    pub authority: Pubkey,
-    pub name: String,
-    pub is_client: bool,
-    pub is_freelancer: bool,
-    pub reputation: u64,
-    pub completed_jobs: u64,
-    pub created_at: i64,
-    pub resume: Option<Resume>,
-    pub disputes_raised: u64,
-    pub disputes_resolved: u64,
-    pub total_earnings: u64,
-    pub total_spent: u64,
-    pub active_jobs: u64,
-    pub pending_jobs: u64,
-    pub cancelled_jobs: u64,
-}
-impl User {
-    pub const LEN: usize = 32 + 4 + 100 + 1 + 1 + 8 + 8 + 8 + 8 + (4 + 1000) + 8 + 8 + 8 + 8 + 8 + 8;
-}
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Resume {
-    pub education: Vec<Education>,
-    pub experience: Vec<Experience>,
-    pub skills: Vec<String>,
-    pub certifications: Vec<Certification>,
-    pub portfolio: Vec<PortfolioItem>,
-}
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Education {
-    pub institution: Option<String>,
-    pub degree: Option<String>,
-    pub field_of_study: Option<String>,
-    pub start_date: Option<i64>,
-    pub end_date: Option<i64>,
-    pub grade: Option<String>,
-    pub description: Option<String>,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Experience {
-    pub company: Option<String>,
-    pub position: Option<String>,
-    pub start_date: Option<i64>,
-    pub end_date: Option<i64>,
-    pub responsibilities: Option<String>,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Certification {
-    pub name: Option<String>,
-    pub issuing_organization: Option<String>,
-    pub issue_date: Option<i64>,
-    pub expiration_date: Option<i64>,
-    pub credential_id: Option<String>,
-    pub credential_url: Option<String>,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct PortfolioItem {
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub url: Option<String>,
-    pub image_url: Option<String>,
-}
 
 #[program]
 pub mod backend {
+
     use super::*;
 
     pub fn register_user(
         ctx: Context<Initialize>,
         name: String,
-        isClient: bool,
-        isFreelancer: bool,
+        is_client: bool,
+        is_freelancer: bool,
         resume: Option<Resume>,
     ) -> Result<()> {
         let user = &mut ctx.accounts.user;
         user.authority = *ctx.accounts.authority.key;
         user.name = name;
-        user.is_client = isClient;
-        user.is_freelancer = isFreelancer;
+        user.is_client = is_client;
+        user.is_freelancer = is_freelancer;
         user.reputation = 50;
         user.completed_jobs = 0;
         user.created_at = Clock::get()?.unix_timestamp;
@@ -100,20 +42,77 @@ pub mod backend {
         require!(user.authority == *ctx.accounts.authority.key, ErrorCode::AuthorityMismatch);
         Ok(())
     }
-}
 
-#[derive(Accounts)]
-pub struct Initialize<'info>{
-    #[account(init, payer = authority, space = 8 + User::LEN)]
-    pub user: Account<'info, User>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
+    pub fn update_user_info(
+        ctx: Context<UpdateUserInfo>,
+        new_name: Option<String>,
+        new_is_client: Option<bool>,
+        new_is_freelancer: Option<bool>,
+    ) -> Result<()> {
+        let user = &mut ctx.accounts.user;
 
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Authority mismatch")]
-    AuthorityMismatch,
-    
+        // Authority check
+        require!(user.authority == *ctx.accounts.authority.key, ErrorCode::AuthorityMismatch);
+
+        // Update only provided fields
+        if let Some(name) = new_name {
+            user.name = name;
+        }
+        if let Some(is_client) = new_is_client {
+            user.is_client = is_client;
+        }
+        if let Some(is_freelancer) = new_is_freelancer {
+            user.is_freelancer = is_freelancer;
+        }
+
+        msg!("User info updated for {}", user.authority);
+        Ok(())
+    }
+    pub fn update_resume(
+        ctx: Context<UpdateResumeCtx>,
+        new_resume: Resume,
+    ) -> Result<()> {
+        let user = &mut ctx.accounts.user;
+
+        // Authority check
+        require!(user.authority == *ctx.accounts.authority.key, ErrorCode::AuthorityMismatch);
+
+        // Initialize resume if none exists
+        if user.resume.is_none() {
+            user.resume = Some(Resume {
+                education: vec![],
+                experience: vec![],
+                skills: vec![],
+                certifications: vec![],
+                portfolio: vec![],
+                last_update: Clock::get()?.unix_timestamp,
+            });
+        }
+
+        let resume = user.resume.as_mut().unwrap();
+
+        // Update only provided fields
+        if !new_resume.education.is_empty() {
+            resume.education = new_resume.education;
+        }
+        if !new_resume.experience.is_empty() {
+            resume.experience = new_resume.experience;
+        }
+        if !new_resume.skills.is_empty() {
+            resume.skills = new_resume.skills;
+        }
+        if !new_resume.certifications.is_empty() {
+            resume.certifications = new_resume.certifications;
+        }
+        if !new_resume.portfolio.is_empty() {
+            resume.portfolio = new_resume.portfolio;
+        }
+
+        // Always update timestamp
+        resume.last_update = Clock::get()?.unix_timestamp;
+
+        msg!("Resume updated for {}", user.authority);
+        Ok(())
+    }
+
 }
