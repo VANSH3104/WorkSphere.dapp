@@ -68,3 +68,85 @@ pub struct PortfolioItem {
     pub url: Option<String>,
     pub image_url: Option<String>,
 }
+
+// ALl related to Jobs
+#[account]
+pub struct Job {
+    pub authority: Pubkey,
+    pub client: Pubkey,
+    pub freelancer: Option<Pubkey>,
+    pub bidders: Vec<Bid>,
+    pub title: String,
+    pub description: String,
+    pub budget: u64,
+    pub deadline: i64,
+    pub status: JobStatus,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub milestones: Vec<Milestone>,
+    pub reviews: Vec<Review>,
+    pub dispute: Option<Dispute>,
+}
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Review {
+    pub reviewer: Pubkey,
+    pub rating: u8,
+    pub comment: String,
+    pub created_at: i64,
+}
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Dispute {
+    pub raiser: Pubkey,
+    pub reason: String,
+    pub status: DisputeStatus,
+    pub created_at: i64,
+    pub resolved_at: Option<i64>,
+    pub resolution: Option<String>,
+
+    // for voters
+    pub voting_start: i64,
+    pub voting_end: i64,
+    pub votes_for: u64,
+    pub votes_against: u64,
+    pub voters: Vec<Pubkey>,
+}
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum DisputeStatus {
+    Open,
+    Resolved,
+    Rejected,
+}
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum JobStatus {
+    Open,
+    InProgress,
+    Completed,
+    Cancelled,
+    Disputed,
+}
+impl Job {
+    pub const LEN: usize = 32 + 32 + 32 + 4 + 100 + 4 + 1000 + 8 + 8 + 1 + 8 + 8 + (4 + 1000 * Milestone::LEN) + (4 + 100 * Review::LEN) + (1 + 32 + 4 + 500 + 1 + 8 + 1 + 8 + 4 + 1000);
+}
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Milestone {
+    pub title: String,
+    pub description: String,
+    pub amount: u64,
+    pub due_date: i64,
+    pub is_completed: bool,
+}
+
+impl Milestone {
+    pub const LEN: usize = 4 + 100 + 4 + 1000 + 8 + 8 + 1;
+}
+impl Review {
+    pub const LEN: usize = 32 + 1 + 4 + 500 + 8;
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct Bid {
+    pub freelancer: Pubkey,
+    pub proposed_amount: u64,
+    pub timestamp: i64,
+}
+

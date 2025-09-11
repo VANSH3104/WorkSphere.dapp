@@ -13,6 +13,7 @@ declare_id!("DuCPxi74kZ5FiF1koqBCXNZbW1uNGfioEnJdb6syKcB8");
 #[program]
 pub mod backend {
 
+
     use super::*;
 
     pub fn register_user(
@@ -23,7 +24,7 @@ pub mod backend {
         resume: Option<Resume>,
     ) -> Result<()> {
         let user = &mut ctx.accounts.user;
-        user.authority = *ctx.accounts.authority.key;
+        user.authority = ctx.accounts.authority.key();
         user.name = name;
         user.is_client = is_client;
         user.is_freelancer = is_freelancer;
@@ -39,7 +40,7 @@ pub mod backend {
         user.pending_jobs = 0;
         user.cancelled_jobs = 0;
         
-        require!(user.authority == *ctx.accounts.authority.key, ErrorCode::AuthorityMismatch);
+        require!(user.authority == ctx.accounts.authority.key(), ErrorCode::AuthorityMismatch);
         Ok(())
     }
 
@@ -52,7 +53,7 @@ pub mod backend {
         let user = &mut ctx.accounts.user;
 
         // Authority check
-        require!(user.authority == *ctx.accounts.authority.key, ErrorCode::AuthorityMismatch);
+        require!(user.authority == ctx.accounts.authority.key(), ErrorCode::AuthorityMismatch);
 
         // Update only provided fields
         if let Some(name) = new_name {
@@ -75,7 +76,7 @@ pub mod backend {
         let user = &mut ctx.accounts.user;
 
         // Authority check
-        require!(user.authority == *ctx.accounts.authority.key, ErrorCode::AuthorityMismatch);
+        require!(user.authority == ctx.accounts.authority.key(), ErrorCode::AuthorityMismatch);
 
         // Initialize resume if none exists
         if user.resume.is_none() {
@@ -115,4 +116,32 @@ pub mod backend {
         Ok(())
     }
 
+    pub fn create_job(
+        ctx: Context<CreateJob>,
+        title: String,
+        description: String,
+        budget: u64,
+        deadline: i64,
+        milestones: Vec<Milestone>,
+    ) -> Result<()> {
+        
+        let job = &mut ctx.accounts.job;
+        let now = &Clock::get()?.unix_timestamp;
+        job.authority = ctx.accounts.authority.key();
+        job.freelancer = None;
+        job.bidders = Vec::new();
+        job.client = ctx.accounts.authority.key();
+        job.title = title;
+        job.description = description;
+        job.budget = budget;
+        job.deadline = deadline;
+        job.status = JobStatus::Open;
+        job.created_at = *now;
+        job.updated_at = *now;
+        job.milestones = milestones;
+        job.dispute = None;
+        require!(job.authority == ctx.accounts.authority.key(), ErrorCode::AuthorityMismatch);
+
+        Ok(())
+    }
 }
