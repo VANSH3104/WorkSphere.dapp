@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Star, Quote } from "lucide-react";
-import { Button } from "@/app/module/ui/button";
+import { Button } from "@/app/(module)/ui/button";
 
 const TestimonialsSection = () => {
   const [currentIndex, setCurrentIndex] = useState(0);

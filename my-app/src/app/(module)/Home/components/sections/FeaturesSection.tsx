@@ -1,4 +1,5 @@
-import { Button } from "@/app/module/ui/button";
+
+import { Button } from "@/app/(module)/ui/button";
 import { 
   Shield, 
   Users, 

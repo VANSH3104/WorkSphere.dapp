@@ -3,7 +3,7 @@
 import { ArrowRight, Sparkles, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Button } from "@/app/module/ui/button";
+import { Button } from "@/app/(module)/ui/button";
 import Image from "next/image";
 
 const HeroSection = () => {

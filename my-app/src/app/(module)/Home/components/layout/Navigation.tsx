@@ -2,12 +2,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/app/module/ui/button";
+import { Button } from "@/app/(module)/ui/button";
 import { Wallet, Menu, X, Globe, Zap } from "lucide-react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { motion } from "framer-motion";
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { connected } = useWallet();
 
   const navItems = [
     { name: "Features", href: "#features" },
@@ -46,15 +50,21 @@ const Navigation = () => {
             ))}
           </div>
 
-          {/* Wallet Connection */}
+          {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-4">
             <Button variant="glass" size="sm" asChild>
               <Link href="/onboarding">Launch App</Link>
             </Button>
-            <Button variant="wallet" size="sm" className="gap-2">
-              <Wallet className="h-4 w-4" />
-              Connect Wallet
-            </Button>
+            
+            {/* Wallet Connect Button */}
+            <WalletMultiButton className="!bg-gradient-primary hover:!bg-gradient-primary/90 !border-none !rounded-lg !px-4 !py-2 !text-sm !font-medium !transition-all !duration-300">
+              {!connected && (
+                <>
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Connect Wallet
+                </>
+              )}
+            </WalletMultiButton>
           </div>
 
           {/* Mobile Menu Button */}
@@ -71,29 +81,41 @@ const Navigation = () => {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 glass-panel mt-2 rounded-xl">
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="md:hidden"
+          >
+            <div className="px-2 pt-2 pb-3 space-y-1 glass-panel mt-2 rounded-xl border border-glass-border">
               {navItems.map((item) => (
                 <a
                   key={item.name}
                   href={item.href}
-                  className="block px-3 py-2 text-foreground-muted hover:text-primary transition-colors duration-300"
+                  className="block px-3 py-2 text-foreground-muted hover:text-primary transition-colors duration-300 rounded-lg hover:bg-glass-border/20"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {item.name}
                 </a>
               ))}
-              <div className="pt-4 space-y-2">
+              
+              <div className="pt-4 space-y-3 border-t border-glass-border">
                 <Button variant="glass" size="sm" className="w-full" asChild>
                   <Link href="/onboarding">Launch App</Link>
                 </Button>
-                <Button variant="wallet" size="sm" className="w-full gap-2">
-                  <Wallet className="h-4 w-4" />
-                  Connect Wallet
-                </Button>
+                
+                {/* Mobile Wallet Connect */}
+                <WalletMultiButton className="!w-full !bg-gradient-primary hover:!bg-gradient-primary/90 !border-none !rounded-lg !px-4 !py-2 !text-sm !font-medium !transition-all !duration-300 !flex !items-center !justify-center">
+                  {!connected && (
+                    <>
+                      <Wallet className="h-4 w-4 mr-2" />
+                      Connect Wallet
+                    </>
+                  )}
+                </WalletMultiButton>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
     </nav>
