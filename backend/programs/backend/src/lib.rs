@@ -7,7 +7,7 @@ use state::*;
 use contexts::*;
 use error::ErrorCode;
 
-declare_id!("DuCPxi74kZ5FiF1koqBCXNZbW1uNGfioEnJdb6syKcB8");
+declare_id!("7sAGvmzM9QrCEyAnQZAHBNDakL6cNdWYwXLaDQuPcNdi");
 
 
 #[program]
