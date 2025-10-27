@@ -23,15 +23,19 @@ import {
   Plus,
   Trash2
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/(module)/ui/card";
+import { Button } from "@/app/(module)/ui/button";
+import { Input } from "@/app/(module)/ui/input";
+import { Textarea } from "@/app/(module)/ui/textarea";
+import { Badge } from "@/app/(module)/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/(module)/ui/tabs";
+import { Progress } from "@/app/(module)/ui/progress";
 
-const UserProfilePage = () => {
+interface UserProfilePageProps {
+  role: "freelancer" | "client";
+  onBack: () => void;
+}
+const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
   const [searchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");

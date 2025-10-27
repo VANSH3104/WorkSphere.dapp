@@ -3,7 +3,7 @@
 import { useUser } from "@/(providers)/userProvider";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { DashboardComponent } from "./(components)/Dashcomponent";
-import { RegisterComponent } from "./(components)/RegistereComponent";
+import { RegisterComponent } from "./(components)/Register/RegistereComponent";
 
 export default function DashboardPage() {
   const { connected } = useWallet();
