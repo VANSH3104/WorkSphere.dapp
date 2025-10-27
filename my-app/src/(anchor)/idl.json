@@ -1,5 +1,5 @@
 {
-  "address": "7sAGvmzM9QrCEyAnQZAHBNDakL6cNdWYwXLaDQuPcNdi",
+  "address": "9Vx28qdjzSWZfNJRDUmFtnAh9SWxCPnepAVKTEY1Lii4",
   "metadata": {
     "name": "backend",
     "version": "0.1.0",
@@ -23,7 +23,26 @@
         {
           "name": "job",
           "writable": true,
-          "signer": true
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "title"
+              }
+            ]
+          }
         },
         {
           "name": "authority",
@@ -80,7 +99,23 @@
         {
           "name": "user",
           "writable": true,
-          "signer": true
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
         },
         {
           "name": "authority",
@@ -795,5 +830,4 @@
       }
     }
   ]
-
 }

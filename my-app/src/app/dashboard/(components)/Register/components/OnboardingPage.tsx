@@ -3,12 +3,16 @@ import { useState, useEffect } from "react";
 import { User, Building, ArrowRight, CheckCircle, Sparkles } from "lucide-react";
 import { Button } from "@/app/(module)/ui/button";
 import { Input } from "@/app/(module)/ui/input";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { registerUser } from "@/(anchor)/actions/registeruser";
 
 const OnboardingPage = () => {
   const [selectedRole, setSelectedRole] = useState<"freelancer" | "client" | null>(null);
   const [name, setName] = useState("");
   const [isVisible, setIsVisible] = useState(false);
   const [currentStep, setCurrentStep] = useState<"role" | "name">("role");
+  const { publicKey, connected, wallet } = useWallet();
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
@@ -59,9 +63,28 @@ const OnboardingPage = () => {
     }, 300);
   };
 
-  const handleNameSubmit = () => {
-    // Handle name submission and proceed to next step
-    console.log({ name, role: selectedRole });
+  const handleNameSubmit = async() => {
+    console.log(connected, publicKey);
+    if (!connected || !publicKey) {
+      alert("Please connect your wallet first!");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const isFreelancer = selectedRole === "freelancer";
+      const isClient = selectedRole === "client";
+      const userData = await registerUser(wallet?.adapter, name, isClient, isFreelancer);
+
+      console.log("✅ User registered:", userData);
+      alert("User registered successfully!");
+    } catch (err) {
+      console.error("Error:", err);
+      alert("Registration failed. Check console for details.");
+    } finally {
+      setLoading(false);
+    }
+
   };
 
   return (
@@ -135,7 +158,7 @@ const OnboardingPage = () => {
           </div>
         </div>
 
-        {/* Role Selection Step */}
+
         {currentStep === "role" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {roles.map((role, index) => (
@@ -235,10 +258,10 @@ const OnboardingPage = () => {
               <div className="space-y-4">
                 <div className="text-center mb-6">
                   <h2 className="text-2xl font-bold text-foreground mb-2">
-                    What's your name?
+                    What&apos;s your name?
                   </h2>
                   <p className="text-foreground-muted">
-                    This is how you'll appear on WorkSphere
+                    This is how you&apos;ll appear on WorkSphere
                   </p>
                 </div>
 
@@ -267,12 +290,12 @@ const OnboardingPage = () => {
                   </Button>
                   <Button
                     onClick={handleNameSubmit}
-                    disabled={!name.trim()}
+                    disabled={!name.trim() || loading}
                     className="flex-1 gap-2 bg-gradient-to-r from-neon-cyan to-neon-purple hover:opacity-90 transition-opacity"
                   >
-                    Continue
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
+                    {loading ? "Registering..." : "Continue"}
+                    {!loading && <ArrowRight className="h-4 w-4" />}
+                  </Button> 
                 </div>
               </div>
             </div>

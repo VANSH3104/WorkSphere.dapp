@@ -1,30 +1,49 @@
-import { Program, AnchorProvider, IdlAccounts, Wallet } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, IdlAccounts } from "@coral-xyz/anchor";
 import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
+import { Idl } from "@coral-xyz/anchor";
+
+// ✅ Import your IDL properly
 import BackendIdl from "./idl.json";
-import { Idl } from "@project-serum/anchor";
 
-// ✅ Program ID
-export const programId = new PublicKey(BackendIdl.address);
+// ✅ Type assertion for better TypeScript support
+type BackendProgram = typeof BackendIdl;
 
-// ✅ Connection
-export const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+// ✅ Program ID with validation
+const programAddress = BackendIdl.address || BackendIdl.metadata?.address;
+if (!programAddress) {
+  throw new Error("Program address not found in IDL");
+}
+export const programId = new PublicKey(programAddress);
 
-// ✅ Function to create program with actual wallet
-export const getProgram = (wallet: Wallet) => {
-    console.log("here")
+// ✅ Connection - use localnet for development
+export const connection = new Connection(
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com", // localnet
+  "confirmed"
+);
+
+// ✅ Function to create program with proper typing
+export const getProgram = (wallet: any) => {
+  // Validate wallet
+  if (!wallet) {
+    throw new Error("Wallet is required");
+  }
+  if (!wallet.publicKey) {
+    throw new Error("Wallet public key not available");
+  }
+
   const provider = new AnchorProvider(
     connection,
     wallet,
     { preflightCommitment: "confirmed" }
   );
+
   return new Program(
     BackendIdl as Idl,
-    // programId,
     provider
   );
 };
 
-// ✅ PDA helpers (these don't need wallet)
+// ✅ PDA helpers
 export const findUserPDA = (authority: PublicKey) =>
   PublicKey.findProgramAddressSync(
     [Buffer.from("user"), authority.toBuffer()],
@@ -38,6 +57,6 @@ export const findJobPDA = (authority: PublicKey, title: string) =>
   );
 
 // ✅ Types
-export type BackendAccounts = IdlAccounts<typeof BackendIdl>;
-export type UserAccount = BackendAccounts["User"];
-export type JobAccount = BackendAccounts["Job"];
+export type BackendAccounts = IdlAccounts<BackendProgram>;
+export type UserAccount = BackendAccounts["user"]; // Note: lowercase "user"
+export type JobAccount = BackendAccounts["job"];   // Note: lowercase "job"
