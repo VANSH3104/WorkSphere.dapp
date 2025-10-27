@@ -5,7 +5,7 @@ import { Button } from "@/app/(module)/ui/button";
 import { Input } from "@/app/(module)/ui/input";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { registerUser } from "@/(anchor)/actions/registeruser";
-
+import { useRouter } from "next/navigation";
 const OnboardingPage = () => {
   const [selectedRole, setSelectedRole] = useState<"freelancer" | "client" | null>(null);
   const [name, setName] = useState("");
@@ -13,6 +13,7 @@ const OnboardingPage = () => {
   const [currentStep, setCurrentStep] = useState<"role" | "name">("role");
   const { publicKey, connected, wallet } = useWallet();
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setIsVisible(true);
@@ -78,6 +79,7 @@ const OnboardingPage = () => {
 
       console.log("✅ User registered:", userData);
       alert("User registered successfully!");
+      router.refresh();
     } catch (err) {
       console.error("Error:", err);
       alert("Registration failed. Check console for details.");
