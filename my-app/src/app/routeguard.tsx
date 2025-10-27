@@ -11,7 +11,6 @@ export function WalletProtected({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(false);
   
-  console.log(connected, "wallet connected");
   
   useEffect(() => {
     if (!connected && pathname !== '/') {

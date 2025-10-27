@@ -1,0 +1,799 @@
+{
+  "address": "7sAGvmzM9QrCEyAnQZAHBNDakL6cNdWYwXLaDQuPcNdi",
+  "metadata": {
+    "name": "backend",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "create_job",
+      "discriminator": [
+        178,
+        130,
+        217,
+        110,
+        100,
+        27,
+        82,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "budget",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        },
+        {
+          "name": "milestones",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "Milestone"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_user",
+      "discriminator": [
+        2,
+        241,
+        150,
+        223,
+        99,
+        214,
+        116,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "is_client",
+          "type": "bool"
+        },
+        {
+          "name": "is_freelancer",
+          "type": "bool"
+        },
+        {
+          "name": "resume",
+          "type": {
+            "option": {
+              "defined": {
+                "name": "Resume"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_resume",
+      "discriminator": [
+        91,
+        169,
+        107,
+        216,
+        171,
+        195,
+        229,
+        243
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_resume",
+          "type": {
+            "defined": {
+              "name": "Resume"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_user_info",
+      "discriminator": [
+        57,
+        54,
+        66,
+        193,
+        242,
+        192,
+        215,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_name",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "new_is_client",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "new_is_freelancer",
+          "type": {
+            "option": "bool"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Job",
+      "discriminator": [
+        75,
+        124,
+        80,
+        203,
+        161,
+        180,
+        202,
+        80
+      ]
+    },
+    {
+      "name": "User",
+      "discriminator": [
+        159,
+        117,
+        95,
+        227,
+        239,
+        151,
+        58,
+        236
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AuthorityMismatch",
+      "msg": "Authority mismatch"
+    }
+  ],
+  "types": [
+    {
+      "name": "Bid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Certification",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "issuing_organization",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "issue_date",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "expiration_date",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "credential_id",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "credential_url",
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dispute",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "raiser",
+            "type": "pubkey"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "DisputeStatus"
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "resolved_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "resolution",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "voting_start",
+            "type": "i64"
+          },
+          {
+            "name": "voting_end",
+            "type": "i64"
+          },
+          {
+            "name": "votes_for",
+            "type": "u64"
+          },
+          {
+            "name": "votes_against",
+            "type": "u64"
+          },
+          {
+            "name": "voters",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Resolved"
+          },
+          {
+            "name": "Rejected"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Education",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "institution",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "degree",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "field_of_study",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "start_date",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "end_date",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "grade",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "description",
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Experience",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "company",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "position",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "start_date",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "end_date",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "responsibilities",
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Job",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "client",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "bidders",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Bid"
+                }
+              }
+            }
+          },
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "budget",
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "JobStatus"
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "milestones",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Milestone"
+                }
+              }
+            }
+          },
+          {
+            "name": "reviews",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Review"
+                }
+              }
+            }
+          },
+          {
+            "name": "dispute",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Dispute"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "InProgress"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Disputed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Milestone",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "due_date",
+            "type": "i64"
+          },
+          {
+            "name": "is_completed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PortfolioItem",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "title",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "description",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "url",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "image_url",
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Resume",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "education",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Education"
+                }
+              }
+            }
+          },
+          {
+            "name": "experience",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Experience"
+                }
+              }
+            }
+          },
+          {
+            "name": "skills",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "certifications",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Certification"
+                }
+              }
+            }
+          },
+          {
+            "name": "portfolio",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "PortfolioItem"
+                }
+              }
+            }
+          },
+          {
+            "name": "last_update",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Review",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "reviewer",
+            "type": "pubkey"
+          },
+          {
+            "name": "rating",
+            "type": "u8"
+          },
+          {
+            "name": "comment",
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "User",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "is_client",
+            "type": "bool"
+          },
+          {
+            "name": "is_freelancer",
+            "type": "bool"
+          },
+          {
+            "name": "reputation",
+            "type": "u64"
+          },
+          {
+            "name": "completed_jobs",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "resume",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Resume"
+                }
+              }
+            }
+          },
+          {
+            "name": "disputes_raised",
+            "type": "u64"
+          },
+          {
+            "name": "disputes_resolved",
+            "type": "u64"
+          },
+          {
+            "name": "total_earnings",
+            "type": "u64"
+          },
+          {
+            "name": "total_spent",
+            "type": "u64"
+          },
+          {
+            "name": "active_jobs",
+            "type": "u64"
+          },
+          {
+            "name": "pending_jobs",
+            "type": "u64"
+          },
+          {
+            "name": "cancelled_jobs",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+
+}

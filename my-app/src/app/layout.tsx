@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 import { Inter } from "next/font/google";
 import { SolanaWalletProvider } from "@/(providers)/WalletProvider";
 import { WalletProtected } from "./routeguard";
+import { UserProvider } from "@/(providers)/userProvider";
 
 
 const inter = Inter({
@@ -41,7 +42,9 @@ export default function RootLayout({
       >
         <SolanaWalletProvider>
         <WalletProtected>
+          <UserProvider>
         {children}
+        </UserProvider>
        </WalletProtected>
         </SolanaWalletProvider>
       </body>
