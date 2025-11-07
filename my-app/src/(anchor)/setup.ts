@@ -2,26 +2,21 @@ import { Program, AnchorProvider, IdlAccounts } from "@coral-xyz/anchor";
 import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
 import { Idl } from "@coral-xyz/anchor";
 
-// ✅ Import your IDL properly
 import BackendIdl from "./idl.json";
 
-// ✅ Type assertion for better TypeScript support
 type BackendProgram = typeof BackendIdl;
 
-// ✅ Program ID with validation
 const programAddress = BackendIdl.address || BackendIdl.metadata?.address;
 if (!programAddress) {
   throw new Error("Program address not found in IDL");
 }
 export const programId = new PublicKey(programAddress);
 
-// ✅ Connection - use localnet for development
 export const connection = new Connection(
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com", // localnet
   "confirmed"
 );
 
-// ✅ Function to create program with proper typing
 export const getProgram = (wallet: any) => {
   // Validate wallet
   if (!wallet) {

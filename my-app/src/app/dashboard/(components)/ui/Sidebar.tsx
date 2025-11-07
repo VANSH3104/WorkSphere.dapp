@@ -27,9 +27,9 @@ import { useRouter } from "next/navigation";
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  userRole: "freelancer" | "client";
+  userRole: "freelancer" | "client" | string;
   userName: string;
-  walletAddress: string;
+  walletAddress: string | undefined;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }

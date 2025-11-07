@@ -12,7 +12,7 @@ import { SidebarProvider } from "../(module)/ui/sidebar";
 export default function DashboardPage() {
   const { connected } = useWallet();
   const { user, isRegistered, loading } = useUser();
-
+  const role = user?.isFreelancer === true ? "freelancer" : "client";
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -36,7 +36,7 @@ export default function DashboardPage() {
         <TooltipProvider>
         <Toaster />
         <Sonner />
-        <DashboardComponent role="freelancer" />;
+        <DashboardComponent role={role} />;
         </TooltipProvider>
         </SidebarProvider>
       </div>

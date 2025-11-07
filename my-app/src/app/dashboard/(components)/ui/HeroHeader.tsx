@@ -1,12 +1,15 @@
+"use client"
 import { Badge } from "@/app/(module)/ui/badge";
 import { Button } from "@/app/(module)/ui/button";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { motion } from "framer-motion";
 import { Wallet, Star, Shield, User, Copy, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 interface HeroHeaderProps {
   userName: string;
-  userRole: "freelancer" | "client";
+  userRole: "freelancer" | "client" ;
   reputation: number;
   totalEarnings: string;
   walletAddress: string;
@@ -22,7 +25,8 @@ export const HeroHeader = ({
   walletBalance
 }: HeroHeaderProps) => {
   const [isConnected, setIsConnected] = useState(true);
-
+  const { disconnect } = useWallet();
+  const router = useRouter()
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
@@ -135,7 +139,7 @@ export const HeroHeader = ({
           transition={{ delay: 0.4, duration: 0.6 }}
         >
           <div className="glass-card p-4 text-center hover-lift">
-            <div className="text-2xl font-bold text-neon-gold">{totalEarnings}</div>
+            <div className="text-2xl font-bold text-neon-gold">{totalEarnings} SOL</div>
             <div className="text-sm text-foreground-muted">Total Earnings</div>
           </div>
           <div className="glass-card p-4 text-center hover-lift">
@@ -200,7 +204,11 @@ export const HeroHeader = ({
                 ? "border-destructive text-destructive hover:bg-destructive hover:text-white" 
                 : "bg-gradient-primary text-white hover:shadow-neon border-0"
               } px-8 py-2 font-semibold transition-all duration-300`}
-              onClick={() => setIsConnected(!isConnected)}
+              onClick={() => {
+                disconnect();
+                setIsConnected(false);
+                router.push("/")
+              }}
             >
               <Wallet className="w-4 h-4 mr-2" />
               {isConnected ? "Disconnect" : "Connect Wallet"}

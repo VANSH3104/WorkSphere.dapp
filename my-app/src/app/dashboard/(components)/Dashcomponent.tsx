@@ -1,3 +1,4 @@
+"use client"
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
@@ -8,22 +9,35 @@ import { ResumePortfolio } from "./ui/ResumePortfolio";
 import { MetricsCards } from "./ui/MetricsCards";
 import { HeroHeader } from "./ui/HeroHeader";
 import { Sidebar } from "./ui/Sidebar";
+import { useUser } from "@/(providers)/userProvider";
+import { useWallet } from "@solana/wallet-adapter-react";;
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { connection } from "@/(anchor)/setup";
 
-export const DashboardComponent = ({ role }: { role: string }) => {
+export const DashboardComponent = ({ role }: { role:  "freelancer" | "client" }) => {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [userRole, setUserRole] = useState<"freelancer" | "client">("freelancer");
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-
-  // Sample user data - in real app this would come from API/wallet
+  const { publicKey } = useWallet();
+  const [balance, setBalance] = useState(0);
+  const { user } = useUser()  
+  useEffect(() => {
+      const fetchBalance = async () => {
+        if (publicKey) {
+          const lamports = await connection.getBalance(publicKey);
+          setBalance(lamports / LAMPORTS_PER_SOL);
+        }
+      };
+      fetchBalance();
+    }, [publicKey]);
+  const userRole = role;
   const userData = {
-    userName: "John Doe",
-    reputation: 4.9,
-    totalEarnings: "2,847 SOL",
-    walletAddress: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-    walletBalance: "3.4K SOL"
+    userName: user?.name,
+    reputation: user.reputation.toNumber(),
+    totalEarnings: user.totalEarnings.toNumber(),
+    walletAddress: publicKey?.toBase58() || "",
+    walletBalance: `${balance} SOL`
   };
-
+  console.log(user.totalEarnings.toNumber())
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Animated Background Particles */}
