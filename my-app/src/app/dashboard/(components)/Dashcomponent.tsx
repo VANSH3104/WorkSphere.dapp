@@ -30,6 +30,7 @@ export const DashboardComponent = ({ role }: { role:  "freelancer" | "client" })
       fetchBalance();
     }, [publicKey]);
   const userRole = role;
+  console.log(user)
   const userData = {
     userName: user?.name,
     reputation: user.reputation.toNumber(),
@@ -107,7 +108,7 @@ export const DashboardComponent = ({ role }: { role:  "freelancer" | "client" })
                 <MetricsCards userRole={userRole} />
 
                 {/* Resume & Portfolio (Freelancer only) */}
-                <ResumePortfolio userRole={userRole} />
+                <ResumePortfolio userRole={userRole} user={user} />
 
                 {/* Recent Jobs & Projects */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">

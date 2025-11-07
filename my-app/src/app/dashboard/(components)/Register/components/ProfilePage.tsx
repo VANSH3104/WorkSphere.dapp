@@ -1,5 +1,9 @@
+"use client"
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Calendar } from "@/app/(module)/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/app/(module)/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 import { 
   User, 
   Briefcase, 
@@ -28,68 +32,102 @@ import { Button } from "@/app/(module)/ui/button";
 import { Input } from "@/app/(module)/ui/input";
 import { Textarea } from "@/app/(module)/ui/textarea";
 import { Badge } from "@/app/(module)/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/(module)/ui/tabs";
-import { Progress } from "@/app/(module)/ui/progress";
+
+
+// Type definitions
+interface Education {
+  institution: string;
+  degree: string;
+  field_of_study: string;
+  start_date: number | null;
+  end_date: number | null;
+  grade: string;
+  description: string;
+}
+
+interface Experience {
+  company: string;
+  position: string;
+  start_date: number | null;
+  end_date: number | null;
+  responsibilities: string;
+}
+
+interface Certification {
+  name: string;
+  issuing_organization: string;
+  issue_date: number | null;
+  expiration_date: number | null;
+  credential_id: string;
+  credential_url: string;
+}
+
+interface PortfolioItem {
+  title: string;
+  description: string;
+  url: string;
+  image_url: string;
+}
+
+interface Resume {
+  education: Education[];
+  experience: Experience[];
+  skills: string[];
+  certifications: Certification[];
+  portfolio: PortfolioItem[];
+  last_update: number;
+}
+
+interface UserData {
+  authority: string;
+  name: string;
+  is_client: boolean;
+  is_freelancer: boolean;
+  reputation: number;
+  completed_jobs: number;
+  created_at: number;
+  resume: Resume;
+  disputes_raised: number;
+  disputes_resolved: number;
+  total_earnings: number;
+  total_spent: number;
+  active_jobs: number;
+  pending_jobs: number;
+  cancelled_jobs: number;
+}
 
 interface UserProfilePageProps {
   role: "freelancer" | "client";
-  onBack: () => void;
+  onComplete: () => void;
+  userData?: UserData;
+  onSave?: (updatedData: UserData) => void;
 }
-const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
-  const [searchParams] = useSearchParams();
-  const [isEditing, setIsEditing] = useState(false);
+
+const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }: UserProfilePageProps) => {
+  const [isEditing, setIsEditing] = useState(!initialUserData?.resume);
   const [activeTab, setActiveTab] = useState("overview");
-  const [userRole, setUserRole] = useState<"freelancer" | "client">("freelancer");
-  const [userData, setUserData] = useState({
+  const [userRole, setUserRole] = useState<"freelancer" | "client">(role);
+  
+  // Default resume structure
+  const defaultResume: Resume = {
+    education: [],
+    experience: [],
+    skills: [],
+    certifications: [],
+    portfolio: [],
+    last_update: Math.floor(Date.now() / 1000)
+  };
+
+  // Default user data structure
+  const defaultUserData: UserData = {
     authority: "9sR5S...8Hd3k",
     name: "John Doe",
-    is_client: true,
-    is_freelancer: true,
+    is_client: role === "client",
+    is_freelancer: role === "freelancer",
     reputation: 92,
     completed_jobs: 47,
-    created_at: 1672531200,
-    resume: {
-      education: [
-        {
-          institution: "Stanford University",
-          degree: "Master of Science",
-          field_of_study: "Computer Science",
-          start_date: 1577836800,
-          end_date: 1640995200,
-          grade: "4.0 GPA",
-          description: "Specialized in blockchain technology and distributed systems"
-        }
-      ],
-      experience: [
-        {
-          company: "Web3 Innovations",
-          position: "Senior Blockchain Developer",
-          start_date: 1643673600,
-          end_date: null,
-          responsibilities: "Developed smart contracts for DeFi protocols, conducted security audits, and designed tokenomics"
-        }
-      ],
-      skills: ["Solidity", "Rust", "TypeScript", "React", "Anchor Framework", "Smart Contract Security"],
-      certifications: [
-        {
-          name: "Certified Blockchain Developer",
-          issuing_organization: "Blockchain Council",
-          issue_date: 1633046400,
-          expiration_date: 1664582400,
-          credential_id: "CBD-0821-4736",
-          credential_url: "https://blockchain-council.org/certify/08214736"
-        }
-      ],
-      portfolio: [
-        {
-          title: "DeFi Lending Protocol",
-          description: "A fully decentralized lending platform with automated interest rates",
-          url: "https://github.com/johndoe/lending-protocol",
-          image_url: "https://example.com/portfolio/defi-lending.png"
-        }
-      ],
-      last_update: 1672531200
-    },
+    created_at: Math.floor(Date.now() / 1000),
+    resume: defaultResume,
     disputes_raised: 2,
     disputes_resolved: 1,
     total_earnings: 1247000000,
@@ -97,69 +135,75 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
     active_jobs: 3,
     pending_jobs: 2,
     cancelled_jobs: 5
-  });
+  };
 
-  // State for editable resume data
-  const [editableResume, setEditableResume] = useState(userData.resume);
-  const [editableUserData, setEditableUserData] = useState(userData);
+  const [userData, setUserData] = useState<UserData>(initialUserData || defaultUserData);
+  const [editableResume, setEditableResume] = useState<Resume>(
+    (initialUserData?.resume && Object.keys(initialUserData.resume).length > 0) 
+      ? initialUserData.resume 
+      : defaultResume
+  );
+  const [editableUserData, setEditableUserData] = useState<UserData>(userData);
 
   useEffect(() => {
-    const role = searchParams.get("role");
-    if (role === "freelancer" || role === "client") {
-      setUserRole(role);
+    if (initialUserData) {
+      setUserData(initialUserData);
+      setEditableUserData(initialUserData);
+      const resume = (initialUserData.resume && Object.keys(initialUserData.resume).length > 0)
+        ? initialUserData.resume
+        : defaultResume;
+      setEditableResume(resume);
     }
-  }, [searchParams]);
+  }, [initialUserData]);
 
-  // Update editable data when user data changes
-  useEffect(() => {
-    setEditableUserData(userData);
-    setEditableResume(userData.resume || {
-      education: [],
-      experience: [],
-      skills: [],
-      certifications: [],
-      portfolio: [],
-      last_update: Date.now() / 1000
-    });
-  }, [userData]);
-
-  const formatDate = (timestamp) => {
+  const formatDate = (timestamp: number | null): string => {
     if (!timestamp) return "Present";
     return new Date(timestamp * 1000).toLocaleDateString();
   };
 
-  const formatSol = (lamports) => {
+  const formatSol = (lamports: number): string => {
     return (lamports / 1000000000).toFixed(2) + " SOL";
   };
 
-  const handleSaveChanges = () => {
-    // Update the main user data with edited values
-    setUserData({
+  const handleSaveChanges = (): void => {
+    const updatedData: UserData = {
       ...editableUserData,
-      resume: editableResume
-    });
+      resume: {
+        ...editableResume,
+        last_update: Math.floor(Date.now() / 1000)
+      }
+    };
+    
+    setUserData(updatedData);
     setIsEditing(false);
+    
+    if (onSave) {
+      onSave(updatedData);
+    }
+    
+    if (!initialUserData?.resume) {
+      onComplete();
+    }
   };
 
-  const handleCancelEdit = () => {
-    // Reset editable data to original user data
+  const handleCancelEdit = (): void => {
     setEditableUserData(userData);
-    setEditableResume(userData.resume || {
-      education: [],
-      experience: [],
-      skills: [],
-      certifications: [],
-      portfolio: [],
-      last_update: Date.now() / 1000
-    });
+    const resume = (userData.resume && Object.keys(userData.resume).length > 0)
+      ? userData.resume
+      : defaultResume;
+    setEditableResume(resume);
     setIsEditing(false);
+    
+    if (!initialUserData?.resume) {
+      onComplete();
+    }
   };
 
-  const handleAddEducation = () => {
+  const handleAddEducation = (): void => {
     setEditableResume({
       ...editableResume,
       education: [
-        ...editableResume.education,
+        ...(editableResume?.education || []),
         {
           institution: "",
           degree: "",
@@ -173,8 +217,8 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
     });
   };
 
-  const handleRemoveEducation = (index) => {
-    const newEducation = [...editableResume.education];
+  const handleRemoveEducation = (index: number): void => {
+    const newEducation = [...(editableResume?.education || [])];
     newEducation.splice(index, 1);
     setEditableResume({
       ...editableResume,
@@ -182,8 +226,8 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
     });
   };
 
-  const handleEducationChange = (index, field, value) => {
-    const newEducation = [...editableResume.education];
+  const handleEducationChange = (index: number, field: keyof Education, value: string | number | null): void => {
+    const newEducation = [...(editableResume?.education || [])];
     newEducation[index] = {
       ...newEducation[index],
       [field]: value
@@ -194,15 +238,52 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
     });
   };
 
-  const handleAddSkill = () => {
+  const handleAddExperience = (): void => {
     setEditableResume({
       ...editableResume,
-      skills: [...editableResume.skills, ""]
+      experience: [
+        ...(editableResume?.experience || []),
+        {
+          company: "",
+          position: "",
+          start_date: null,
+          end_date: null,
+          responsibilities: ""
+        }
+      ]
     });
   };
 
-  const handleRemoveSkill = (index) => {
-    const newSkills = [...editableResume.skills];
+  const handleRemoveExperience = (index: number): void => {
+    const newExperience = [...(editableResume?.experience || [])];
+    newExperience.splice(index, 1);
+    setEditableResume({
+      ...editableResume,
+      experience: newExperience
+    });
+  };
+
+  const handleExperienceChange = (index: number, field: keyof Experience, value: string | number | null): void => {
+    const newExperience = [...(editableResume?.experience || [])];
+    newExperience[index] = {
+      ...newExperience[index],
+      [field]: value
+    };
+    setEditableResume({
+      ...editableResume,
+      experience: newExperience
+    });
+  };
+
+  const handleAddSkill = (): void => {
+    setEditableResume({
+      ...editableResume,
+      skills: [...(editableResume?.skills || []), ""]
+    });
+  };
+
+  const handleRemoveSkill = (index: number): void => {
+    const newSkills = [...(editableResume?.skills || [])];
     newSkills.splice(index, 1);
     setEditableResume({
       ...editableResume,
@@ -210,13 +291,99 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
     });
   };
 
-  const handleSkillChange = (index, value) => {
-    const newSkills = [...editableResume.skills];
+  const handleSkillChange = (index: number, value: string): void => {
+    const newSkills = [...(editableResume?.skills || [])];
     newSkills[index] = value;
     setEditableResume({
       ...editableResume,
       skills: newSkills
     });
+  };
+
+  const handleAddCertification = (): void => {
+    setEditableResume({
+      ...editableResume,
+      certifications: [
+        ...(editableResume?.certifications || []),
+        {
+          name: "",
+          issuing_organization: "",
+          issue_date: null,
+          expiration_date: null,
+          credential_id: "",
+          credential_url: ""
+        }
+      ]
+    });
+  };
+
+  const handleRemoveCertification = (index: number): void => {
+    const newCertifications = [...(editableResume?.certifications || [])];
+    newCertifications.splice(index, 1);
+    setEditableResume({
+      ...editableResume,
+      certifications: newCertifications
+    });
+  };
+
+  const handleCertificationChange = (index: number, field: keyof Certification, value: string | number | null): void => {
+    const newCertifications = [...(editableResume?.certifications || [])];
+    newCertifications[index] = {
+      ...newCertifications[index],
+      [field]: value
+    };
+    setEditableResume({
+      ...editableResume,
+      certifications: newCertifications
+    });
+  };
+
+  const handleAddPortfolio = (): void => {
+    setEditableResume({
+      ...editableResume,
+      portfolio: [
+        ...(editableResume?.portfolio || []),
+        {
+          title: "",
+          description: "",
+          url: "",
+          image_url: ""
+        }
+      ]
+    });
+  };
+
+  const handleRemovePortfolio = (index: number): void => {
+    const newPortfolio = [...(editableResume?.portfolio || [])];
+    newPortfolio.splice(index, 1);
+    setEditableResume({
+      ...editableResume,
+      portfolio: newPortfolio
+    });
+  };
+
+  const handlePortfolioChange = (index: number, field: keyof PortfolioItem, value: string): void => {
+    const newPortfolio = [...(editableResume?.portfolio || [])];
+    newPortfolio[index] = {
+      ...newPortfolio[index],
+      [field]: value
+    };
+    setEditableResume({
+      ...editableResume,
+      portfolio: newPortfolio
+    });
+  };
+
+  const handleSubmitToBlockchain = async (): Promise<void> => {
+    console.log("Submitting resume to blockchain...", editableResume);
+    
+    try {
+      // Placeholder for blockchain transaction
+      alert("Blockchain integration coming soon!");
+    } catch (error) {
+      console.error("Error submitting to blockchain:", error);
+      alert("Failed to submit to blockchain");
+    }
   };
 
   const stats = [
@@ -247,101 +414,114 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
     }
   ];
 
-  const renderResumeSection = () => {
-    if (!editableResume) {
-      return (
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Resume
-            </CardTitle>
-            <CardDescription>No resume information available</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" className="gap-2">
-              <Upload className="h-4 w-4" />
-              Upload Resume
-            </Button>
-          </CardContent>
-        </Card>
-      );
-    }
-
+  const renderResumeSection = (): JSX.Element => {
     return (
       <div className="space-y-6">
         {/* Education */}
-        <Card className="glass-card">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5" />
+        <Card className="glass-card border-2 border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <GraduationCap className="h-5 w-5 text-neon-cyan" />
               Education
             </CardTitle>
             {isEditing && (
-              <Button variant="outline" size="sm" onClick={handleAddEducation} className="gap-2">
+              <Button variant="outline" size="sm" onClick={handleAddEducation} className="gap-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10">
                 <Plus className="h-4 w-4" />
                 Add Education
               </Button>
             )}
           </CardHeader>
-          <CardContent className="space-y-4">
-            {editableResume.education.map((edu, index) => (
-              <div key={index} className="p-4 glass-panel rounded-lg">
+          <CardContent className="space-y-4 pt-6">
+            {(editableResume?.education || []).map((edu, index) => (
+              <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Institution</label>
+                        <label className="text-sm font-medium text-foreground">Institution</label>
                         <Input 
                           value={edu.institution || ""} 
                           onChange={(e) => handleEducationChange(index, 'institution', e.target.value)}
+                          className="bg-background/50"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Degree</label>
+                        <label className="text-sm font-medium text-foreground">Degree</label>
                         <Input 
                           value={edu.degree || ""} 
                           onChange={(e) => handleEducationChange(index, 'degree', e.target.value)}
+                          className="bg-background/50"
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Field of Study</label>
+                      <label className="text-sm font-medium text-foreground">Field of Study</label>
                       <Input 
                         value={edu.field_of_study || ""} 
                         onChange={(e) => handleEducationChange(index, 'field_of_study', e.target.value)}
+                        className="bg-background/50"
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Start Date</label>
-                        <Input 
-                          type="date"
-                          value={edu.start_date ? new Date(edu.start_date * 1000).toISOString().split('T')[0] : ""} 
-                          onChange={(e) => handleEducationChange(index, 'start_date', new Date(e.target.value).getTime() / 1000)}
-                        />
+                        <label className="text-sm font-medium text-foreground">Start Date</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal bg-background/50"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {edu.start_date ? format(new Date(edu.start_date * 1000), "PPP") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={edu.start_date ? new Date(edu.start_date * 1000) : undefined}
+                              onSelect={(date) => handleEducationChange(index, 'start_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">End Date</label>
-                        <Input 
-                          type="date"
-                          value={edu.end_date ? new Date(edu.end_date * 1000).toISOString().split('T')[0] : ""} 
-                          onChange={(e) => handleEducationChange(index, 'end_date', e.target.value ? new Date(e.target.value).getTime() / 1000 : null)}
-                        />
+                        <label className="text-sm font-medium text-foreground">End Date</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal bg-background/50"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {edu.end_date ? format(new Date(edu.end_date * 1000), "PPP") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={edu.end_date ? new Date(edu.end_date * 1000) : undefined}
+                              onSelect={(date) => handleEducationChange(index, 'end_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Grade</label>
+                      <label className="text-sm font-medium text-foreground">Grade</label>
                       <Input 
                         value={edu.grade || ""} 
                         onChange={(e) => handleEducationChange(index, 'grade', e.target.value)}
+                        className="bg-background/50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Description</label>
+                      <label className="text-sm font-medium text-foreground">Description</label>
                       <Textarea 
                         value={edu.description || ""} 
                         onChange={(e) => handleEducationChange(index, 'description', e.target.value)}
+                        className="bg-background/50 min-h-[80px]"
                       />
                     </div>
                     <Button variant="destructive" size="sm" onClick={() => handleRemoveEducation(index)} className="gap-2">
@@ -353,91 +533,136 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
                   <>
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-semibold">{edu.institution}</h3>
+                        <h3 className="font-semibold text-lg text-foreground">{edu.institution}</h3>
                         <p className="text-foreground-muted">{edu.degree} in {edu.field_of_study}</p>
-                        {edu.grade && <p className="text-sm text-foreground-muted">Grade: {edu.grade}</p>}
+                        {edu.grade && <p className="text-sm text-foreground-muted mt-1">Grade: {edu.grade}</p>}
                       </div>
                       <div className="text-right text-sm text-foreground-muted">
                         <p>{formatDate(edu.start_date)} - {formatDate(edu.end_date)}</p>
                       </div>
                     </div>
                     {edu.description && (
-                      <p className="mt-2 text-sm">{edu.description}</p>
+                      <p className="mt-3 text-sm text-foreground/80 leading-relaxed">{edu.description}</p>
                     )}
                   </>
                 )}
               </div>
             ))}
-            {editableResume.education.length === 0 && !isEditing && (
-              <p className="text-foreground-muted text-center py-4">No education information added yet.</p>
+            {(editableResume?.education || []).length === 0 && !isEditing && (
+              <div className="text-center py-8 border-2 border-dashed border-border/30 rounded-lg">
+                <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-foreground-muted">No education information added yet.</p>
+                <Button variant="outline" onClick={() => setIsEditing(true)} className="mt-3 gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Education
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Skills */}
-        <Card className="glass-card">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Skills
+        {/* Experience */}
+        <Card className="glass-card border-2 border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Building className="h-5 w-5 text-neon-purple" />
+              Experience
             </CardTitle>
             {isEditing && (
-              <Button variant="outline" size="sm" onClick={handleAddSkill} className="gap-2">
+              <Button variant="outline" size="sm" onClick={handleAddExperience} className="gap-2 border-neon-purple text-neon-purple hover:bg-neon-purple/10">
                 <Plus className="h-4 w-4" />
-                Add Skill
+                Add Experience
               </Button>
             )}
           </CardHeader>
-          <CardContent>
-            {isEditing ? (
-              <div className="space-y-4">
-                {editableResume.skills.map((skill, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Input 
-                      value={skill} 
-                      onChange={(e) => handleSkillChange(index, e.target.value)}
-                      placeholder="Enter a skill"
-                    />
-                    <Button variant="destructive" size="icon" onClick={() => handleRemoveSkill(index)}>
+          <CardContent className="space-y-4 pt-6">
+            {(editableResume?.experience || []).map((exp, index) => (
+              <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
+                {isEditing ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Company</label>
+                        <Input 
+                          value={exp.company || ""} 
+                          onChange={(e) => handleExperienceChange(index, 'company', e.target.value)}
+                          className="bg-background/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Position</label>
+                        <Input 
+                          value={exp.position || ""} 
+                          onChange={(e) => handleExperienceChange(index, 'position', e.target.value)}
+                          className="bg-background/50"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Start Date</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal bg-background/50"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {exp.start_date ? format(new Date(exp.start_date * 1000), "PPP") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={exp.start_date ? new Date(exp.start_date * 1000) : undefined}
+                              onSelect={(date) => handleExperienceChange(index, 'start_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">End Date</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal bg-background/50"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {exp.end_date ? format(new Date(exp.end_date * 1000), "PPP") : "Present"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={exp.end_date ? new Date(exp.end_date * 1000) : undefined}
+                              onSelect={(date) => handleExperienceChange(index, 'end_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Responsibilities</label>
+                      <Textarea 
+                        value={exp.responsibilities || ""} 
+                        onChange={(e) => handleExperienceChange(index, 'responsibilities', e.target.value)}
+                        className="bg-background/50 min-h-[100px]"
+                        placeholder="Describe your key responsibilities and achievements..."
+                      />
+                    </div>
+                    <Button variant="destructive" size="sm" onClick={() => handleRemoveExperience(index)} className="gap-2">
                       <Trash2 className="h-4 w-4" />
+                      Remove
                     </Button>
                   </div>
-                ))}
-                {editableResume.skills.length === 0 && (
-                  <p className="text-foreground-muted text-center py-4">No skills added yet.</p>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {editableResume.skills.map((skill, index) => (
-                  <Badge key={index} variant="secondary" className="text-sm">
-                    {skill}
-                  </Badge>
-                ))}
-                {editableResume.skills.length === 0 && (
-                  <p className="text-foreground-muted">No skills added yet.</p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Other resume sections would follow similar patterns */}
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5" />
-              Experience
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {editableResume.experience.length > 0 ? (
-              <div className="space-y-4">
-                {editableResume.experience.map((exp, index) => (
-                  <div key={index} className="p-4 glass-panel rounded-lg">
+                ) : (
+                  <>
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-semibold">{exp.company}</h3>
+                        <h3 className="font-semibold text-lg text-foreground">{exp.company}</h3>
                         <p className="text-foreground-muted">{exp.position}</p>
                       </div>
                       <div className="text-right text-sm text-foreground-muted">
@@ -445,34 +670,375 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
                       </div>
                     </div>
                     {exp.responsibilities && (
-                      <p className="mt-2 text-sm">{exp.responsibilities}</p>
+                      <p className="mt-3 text-sm text-foreground/80 leading-relaxed">{exp.responsibilities}</p>
                     )}
-                  </div>
-                ))}
+                  </>
+                )}
               </div>
-            ) : (
-              <p className="text-foreground-muted text-center py-4">No experience information added yet.</p>
+            ))}
+            {(editableResume?.experience || []).length === 0 && !isEditing && (
+              <div className="text-center py-8 border-2 border-dashed border-border/30 rounded-lg">
+                <Building className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-foreground-muted">No experience information added yet.</p>
+                <Button variant="outline" onClick={() => setIsEditing(true)} className="mt-3 gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Experience
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Certifications and Portfolio sections would follow similar patterns */}
+        {/* Skills */}
+        <Card className="glass-card border-2 border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <TrendingUp className="h-5 w-5 text-neon-gold" />
+              Skills
+            </CardTitle>
+            {isEditing && (
+              <Button variant="outline" size="sm" onClick={handleAddSkill} className="gap-2 border-neon-gold text-neon-gold hover:bg-neon-gold/10">
+                <Plus className="h-4 w-4" />
+                Add Skill
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="pt-6">
+            {isEditing ? (
+              <div className="space-y-4">
+                {(editableResume?.skills || []).map((skill, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input 
+                      value={skill} 
+                      onChange={(e) => handleSkillChange(index, e.target.value)}
+                      placeholder="Enter a skill (e.g., React, Solana, Rust)"
+                      className="bg-background/50"
+                    />
+                    <Button variant="destructive" size="icon" onClick={() => handleRemoveSkill(index)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {(editableResume?.skills || []).length === 0 && (
+                  <div className="text-center py-6">
+                    <TrendingUp className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-foreground-muted">No skills added yet. Click "Add Skill" to get started.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {(editableResume?.skills || []).map((skill, index) => (
+                  <Badge key={index} variant="secondary" className="text-sm px-3 py-2 bg-primary/10 text-primary border-primary/20">
+                    {skill}
+                  </Badge>
+                ))}
+                {(editableResume?.skills || []).length === 0 && (
+                  <div className="text-center w-full py-6">
+                    <TrendingUp className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-foreground-muted">No skills added yet.</p>
+                    <Button variant="outline" onClick={() => setIsEditing(true)} className="mt-3 gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add Skills
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Certifications */}
+        <Card className="glass-card border-2 border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Award className="h-5 w-5 text-neon-cyan" />
+              Certifications
+            </CardTitle>
+            {isEditing && (
+              <Button variant="outline" size="sm" onClick={handleAddCertification} className="gap-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10">
+                <Plus className="h-4 w-4" />
+                Add Certification
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            {(editableResume?.certifications || []).map((cert, index) => (
+              <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
+                {isEditing ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Certification Name</label>
+                        <Input 
+                          value={cert.name || ""} 
+                          onChange={(e) => handleCertificationChange(index, 'name', e.target.value)}
+                          placeholder="e.g., AWS Solutions Architect"
+                          className="bg-background/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Issuing Organization</label>
+                        <Input 
+                          value={cert.issuing_organization || ""} 
+                          onChange={(e) => handleCertificationChange(index, 'issuing_organization', e.target.value)}
+                          placeholder="e.g., Amazon Web Services"
+                          className="bg-background/50"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Issue Date</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal bg-background/50"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {cert.issue_date ? format(new Date(cert.issue_date * 1000), "PPP") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={cert.issue_date ? new Date(cert.issue_date * 1000) : undefined}
+                              onSelect={(date) => handleCertificationChange(index, 'issue_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Expiration Date</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal bg-background/50"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {cert.expiration_date ? format(new Date(cert.expiration_date * 1000), "PPP") : "No expiration"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={cert.expiration_date ? new Date(cert.expiration_date * 1000) : undefined}
+                              onSelect={(date) => handleCertificationChange(index, 'expiration_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Credential ID (Optional)</label>
+                        <Input 
+                          value={cert.credential_id || ""} 
+                          onChange={(e) => handleCertificationChange(index, 'credential_id', e.target.value)}
+                          placeholder="e.g., ABC-123-XYZ"
+                          className="bg-background/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Credential URL (Optional)</label>
+                        <Input 
+                          value={cert.credential_url || ""} 
+                          onChange={(e) => handleCertificationChange(index, 'credential_url', e.target.value)}
+                          placeholder="https://..."
+                          className="bg-background/50"
+                        />
+                      </div>
+                    </div>
+                    <Button variant="destructive" size="sm" onClick={() => handleRemoveCertification(index)} className="gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold text-lg text-foreground">{cert.name}</h3>
+                        <p className="text-foreground-muted">{cert.issuing_organization}</p>
+                        {cert.credential_id && (
+                          <p className="text-sm text-foreground-muted mt-1">ID: {cert.credential_id}</p>
+                        )}
+                      </div>
+                      <div className="text-right text-sm text-foreground-muted">
+                        <p>Issued: {formatDate(cert.issue_date)}</p>
+                        {cert.expiration_date && (
+                          <p>Expires: {formatDate(cert.expiration_date)}</p>
+                        )}
+                      </div>
+                    </div>
+                    {cert.credential_url && (
+                      <a 
+                        href={cert.credential_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-neon-cyan hover:underline mt-3 inline-block font-medium"
+                      >
+                        View Credential →
+                      </a>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+            {(editableResume?.certifications || []).length === 0 && !isEditing && (
+              <div className="text-center py-8 border-2 border-dashed border-border/30 rounded-lg">
+                <Award className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-foreground-muted">No certifications added yet.</p>
+                <Button variant="outline" onClick={() => setIsEditing(true)} className="mt-3 gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Certification
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Portfolio */}
+        <Card className="glass-card border-2 border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Briefcase className="h-5 w-5 text-neon-purple" />
+              Portfolio
+            </CardTitle>
+            {isEditing && (
+              <Button variant="outline" size="sm" onClick={handleAddPortfolio} className="gap-2 border-neon-purple text-neon-purple hover:bg-neon-purple/10">
+                <Plus className="h-4 w-4" />
+                Add Project
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            {(editableResume?.portfolio || []).map((item, index) => (
+              <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
+                {isEditing ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Project Title</label>
+                      <Input 
+                        value={item.title || ""} 
+                        onChange={(e) => handlePortfolioChange(index, 'title', e.target.value)}
+                        placeholder="e.g., DeFi Lending Protocol"
+                        className="bg-background/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Description</label>
+                      <Textarea 
+                        value={item.description || ""} 
+                        onChange={(e) => handlePortfolioChange(index, 'description', e.target.value)}
+                        placeholder="Describe your project, technologies used, and your role..."
+                        className="bg-background/50 min-h-[100px]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Project URL (Optional)</label>
+                        <Input 
+                          value={item.url || ""} 
+                          onChange={(e) => handlePortfolioChange(index, 'url', e.target.value)}
+                          placeholder="https://github.com/..."
+                          className="bg-background/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Image URL (Optional)</label>
+                        <Input 
+                          value={item.image_url || ""} 
+                          onChange={(e) => handlePortfolioChange(index, 'image_url', e.target.value)}
+                          placeholder="https://..."
+                          className="bg-background/50"
+                        />
+                      </div>
+                    </div>
+                    <Button variant="destructive" size="sm" onClick={() => handleRemovePortfolio(index)} className="gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold text-lg text-foreground">{item.title}</h3>
+                        <p className="text-foreground-muted text-sm mt-2 leading-relaxed">{item.description}</p>
+                      </div>
+                    </div>
+                    {item.image_url && (
+                      <img 
+                        src={item.image_url} 
+                        alt={item.title}
+                        className="w-full h-48 object-cover rounded-lg mt-3 border border-border/30"
+                      />
+                    )}
+                    {item.url && (
+                      <a 
+                        href={item.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-neon-cyan hover:underline mt-3 inline-block font-medium"
+                      >
+                        View Project →
+                      </a>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+            {(editableResume?.portfolio || []).length === 0 && !isEditing && (
+              <div className="text-center py-8 border-2 border-dashed border-border/30 rounded-lg">
+                <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-foreground-muted">No portfolio items added yet.</p>
+                <Button variant="outline" onClick={() => setIsEditing(true)} className="mt-3 gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Project
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen p-4 lg:p-6 bg-background">
+    <div className="min-h-screen p-4 lg:p-6 bg-gradient-to-br from-background to-muted/20">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-foreground">Profile</h1>
-          <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
+              {!initialUserData?.resume ? "Create Your Resume" : "Professional Resume"}
+            </h1>
+            <p className="text-foreground-muted mt-1">
+              {!initialUserData?.resume 
+                ? "Build your professional profile to showcase your skills and experience" 
+                : "Manage and update your professional information"
+              }
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
             {isEditing ? (
               <>
-                <Button onClick={handleSaveChanges} className="gap-2">
+                <Button onClick={handleSaveChanges} className="gap-2 bg-green-600 hover:bg-green-700">
                   <Save className="h-4 w-4" />
                   Save Changes
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleSubmitToBlockchain} 
+                  className="gap-2 bg-gradient-to-r from-neon-cyan to-neon-purple text-white hover:from-neon-cyan/90 hover:to-neon-purple/90 border-0"
+                >
+                  <Shield className="h-4 w-4" />
+                  Submit to Blockchain
                 </Button>
                 <Button variant="outline" onClick={handleCancelEdit} className="gap-2">
                   <X className="h-4 w-4" />
@@ -480,294 +1046,67 @@ const UserProfilePage = ({role , onBack}: UserProfilePageProps) => {
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setIsEditing(true)} className="gap-2">
-                <Edit3 className="h-4 w-4" />
-                Edit Profile
-              </Button>
+              <>
+                <Button onClick={() => setIsEditing(true)} className="gap-2 bg-primary hover:bg-primary/90">
+                  <Edit3 className="h-4 w-4" />
+                  Edit Resume
+                </Button>
+                <Button variant="outline" onClick={onComplete} className="gap-2">
+                  Back to Dashboard
+                </Button>
+              </>
             )}
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="glass-panel p-1 w-full flex flex-wrap">
-            <TabsTrigger value="overview" className="flex-1 min-w-[120px]">Overview</TabsTrigger>
-            <TabsTrigger value="resume" className="flex-1 min-w-[120px]">Resume</TabsTrigger>
-            <TabsTrigger value="activity" className="flex-1 min-w-[120px]">Activity</TabsTrigger>
-            <TabsTrigger value="settings" className="flex-1 min-w-[120px]">Settings</TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* User Card */}
-            <Card className="glass-card overflow-hidden">
-              <div className="bg-gradient-primary h-32"></div>
-              <CardContent className="relative -mt-16">
-                <div className="flex flex-col md:flex-row md:items-end gap-6">
-                  <div className="w-24 h-24 rounded-full bg-background border-4 border-background flex items-center justify-center">
-                    <User className="h-12 w-12 text-foreground-muted" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div>
-                        <h2 className="text-2xl font-bold">{editableUserData.name}</h2>
-                        <div className="flex items-center gap-2 mt-5">
-                          {editableUserData.is_freelancer && (
-                            <Badge variant="outline" className="bg-neon-cyan/20 text-neon-cyan">
-                              Freelancer
-                            </Badge>
-                          )}
-                          {editableUserData.is_client && (
-                            <Badge variant="outline" className="bg-neon-purple/20 text-neon-purple">
-                              Client
-                            </Badge>
-                          )}
-                          <span className="text-foreground-muted">
-                            Member since {formatDate(editableUserData.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-12">
-                        <Star className="h-5 w-5 text-neon-gold fill-neon-gold" />
-                        <span className="font-semibold">
-                          {(editableUserData.reputation / 20).toFixed(1)}/5.0
-                        </span>
-                        <span className="text-foreground-muted">({editableUserData.completed_jobs} reviews)</span>
-                      </div>
+        {/* Stats Overview */}
+        {!isEditing && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {stats.map((stat, index) => (
+              <Card key={index} className="glass-card border border-border/30">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground-muted">{stat.title}</p>
+                      <p className={`text-2xl font-bold ${stat.color} mt-1`}>{stat.value}</p>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {stats.map((stat, index) => (
-                <Card key={index} className="glass-card p-6 hover-lift">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`w-12 h-12 rounded-xl bg-opacity-20 ${stat.color.replace('text-', 'bg-')} flex items-center justify-center`}>
+                    <div className={`p-3 rounded-full ${stat.color.replace('text-', 'bg-')}/10`}>
                       <stat.icon className={`h-6 w-6 ${stat.color}`} />
                     </div>
                   </div>
-                  {typeof stat.value === 'number' && stat.max ? (
-                    <>
-                      <h3 className="text-2xl font-bold text-foreground mb-1">{stat.value}/{stat.max}</h3>
-                      <Progress value={stat.value} className="h-2 mt-2" />
-                    </>
-                  ) : (
-                    <h3 className="text-2xl font-bold text-foreground mb-1">{stat.value}</h3>
-                  )}
-                  <p className="text-foreground-muted text-sm">{stat.title}</p>
-                </Card>
-              ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Resume Content */}
+        {renderResumeSection()}
+
+        {/* Action Buttons for Mobile */}
+        <div className="fixed bottom-6 left-6 right-6 sm:hidden">
+          <div className="glass-card p-4 rounded-lg border border-border/30">
+            <div className="flex gap-2">
+              {isEditing ? (
+                <>
+                  <Button onClick={handleSaveChanges} className="flex-1 gap-2 bg-green-600 hover:bg-green-700">
+                    <Save className="h-4 w-4" />
+                    Save
+                  </Button>
+                  <Button variant="outline" onClick={handleCancelEdit} className="flex-1 gap-2">
+                    <X className="h-4 w-4" />
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setIsEditing(true)} className="flex-1 gap-2">
+                  <Edit3 className="h-4 w-4" />
+                  Edit
+                </Button>
+              )}
             </div>
-
-            {/* Job Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="glass-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">Job Statistics</h3>
-                  <Briefcase className="h-5 w-5 text-foreground-muted" />
-                </div>
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Active Jobs</span>
-                    <span className="font-semibold">{editableUserData.active_jobs}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Pending Jobs</span>
-                    <span className="font-semibold">{editableUserData.pending_jobs}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Completed Jobs</span>
-                    <span className="font-semibold text-success">{editableUserData.completed_jobs}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Cancelled Jobs</span>
-                    <span className="font-semibold text-destructive">{editableUserData.cancelled_jobs}</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="glass-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">Financial Summary</h3>
-                  <DollarSign className="h-5 w-5 text-foreground-muted" />
-                </div>
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Total Earnings</span>
-                    <span className="font-semibold text-success">{formatSol(editableUserData.total_earnings)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Total Spent</span>
-                    <span className="font-semibold">{formatSol(editableUserData.total_spent)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Net Balance</span>
-                    <span className="font-semibold text-neon-gold">
-                      {formatSol(editableUserData.total_earnings - editableUserData.total_spent)}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="glass-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">Dispute History</h3>
-                  <Shield className="h-5 w-5 text-foreground-muted" />
-                </div>
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Disputes Raised</span>
-                    <span className="font-semibold">{editableUserData.disputes_raised}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Disputes Resolved</span>
-                    <span className="font-semibold text-success">{editableUserData.disputes_resolved}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-muted">Resolution Rate</span>
-                    <span className="font-semibold">
-                      {editableUserData.disputes_raised > 0 
-                        ? ((editableUserData.disputes_resolved / editableUserData.disputes_raised) * 100).toFixed(0) + '%'
-                        : 'N/A'
-                      }
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Resume Tab */}
-          <TabsContent value="resume">
-            {renderResumeSection()}
-          </TabsContent>
-
-          {/* Activity Tab */}
-          <TabsContent value="activity">
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Your recent jobs and transactions on WorkSphere</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 glass-panel rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-success/20 flex items-center justify-center">
-                        <CheckCircle className="h-6 w-6 text-success" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Smart Contract Development</h3>
-                        <p className="text-foreground-muted text-sm">Completed • 12.5 SOL earned</p>
-                      </div>
-                    </div>
-                    <span className="text-foreground-muted text-sm">2 days ago</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 glass-panel rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-neon-cyan/20 flex items-center justify-center">
-                        <Clock className="h-6 w-6 text-neon-cyan" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">NFT Marketplace Design</h3>
-                        <p className="text-foreground-muted text-sm">In progress • 8.2 SOL pending</p>
-                      </div>
-                    </div>
-                    <span className="text-foreground-muted text-sm">1 week ago</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-4 glass-panel rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-destructive/20 flex items-center justify-center">
-                        <AlertCircle className="h-6 w-6 text-destructive" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Dispute: DeFi Protocol Audit</h3>
-                        <p className="text-foreground-muted text-sm">Resolved in your favor</p>
-                      </div>
-                    </div>
-                    <span className="text-foreground-muted text-sm">2 weeks ago</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings">
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
-                <CardDescription>Manage your account preferences and security settings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Profile Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Display Name</label>
-                      <Input 
-                        value={editableUserData.name} 
-                        onChange={(e) => setEditableUserData({...editableUserData, name: e.target.value})}
-                        disabled={!isEditing} 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Wallet Address</label>
-                      <Input value={editableUserData.authority} disabled />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Role Settings</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="checkbox" 
-                        id="is_freelancer" 
-                        checked={editableUserData.is_freelancer} 
-                        onChange={(e) => setEditableUserData({...editableUserData, is_freelancer: e.target.checked})}
-                        disabled={!isEditing}
-                        className="rounded text-primary focus:ring-primary"
-                      />
-                      <label htmlFor="is_freelancer" className="text-sm font-medium">
-                        Freelancer Account
-                      </label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="checkbox" 
-                        id="is_client" 
-                        checked={editableUserData.is_client} 
-                        onChange={(e) => setEditableUserData({...editableUserData, is_client: e.target.checked})}
-                        disabled={!isEditing}
-                        className="rounded text-primary focus:ring-primary"
-                      />
-                      <label htmlFor="is_client" className="text-sm font-medium">
-                        Client Account
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {isEditing && (
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button variant="outline" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleSaveChanges}>
-                      Save Changes
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
     </div>
   );
