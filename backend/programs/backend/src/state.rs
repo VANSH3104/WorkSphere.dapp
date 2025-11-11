@@ -19,7 +19,7 @@ pub struct User{
     pub cancelled_jobs: u64,
 }
 impl User {
-    pub const LEN: usize = 32 + 4 + 100 + 1 + 1 + 8 + 8 + 8 + 8 + (4 + 1000) + 8 + 8 + 8 + 8 + 8 + 8;
+    pub const LEN: usize = 32 + 4 + 100 + 1 + 1 + 8 + 8 + 8 + 8 + (1 + Resume::LEN) + 8 + 8 + 8 + 8 + 8 + 8 + 8;
 }
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Resume {
@@ -29,6 +29,15 @@ pub struct Resume {
     pub certifications: Vec<Certification>,
     pub portfolio: Vec<PortfolioItem>,
     pub last_update: i64,
+}
+impl Resume {
+    pub const LEN: usize = 
+        4 + (5 * Education::LEN) +    // education vector
+        4 + (5 * Experience::LEN) +   // experience vector  
+        4 + (20 * 50) +               // skills vector (20 skills * 50 chars each)
+        4 + (5 * Certification::LEN) + // certifications vector
+        4 + (5 * PortfolioItem::LEN) + // portfolio vector
+        8;                            // last_update
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -41,6 +50,9 @@ pub struct Education {
     pub grade: String,               
     pub description: String, 
 }
+impl Education {
+    pub const LEN: usize = 4 + 100 + 4 + 100 + 4 + 100 + 8 + 8 + 4 + 50 + 4 + 500;
+}
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Experience {
@@ -50,7 +62,9 @@ pub struct Experience {
     pub end_date: i64,               
     pub responsibilities: String,
 }
-
+impl Experience {
+    pub const LEN: usize = 4 + 100 + 4 + 100 + 8 + 8 + 4 + 1000;
+}
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Certification {
     pub name: String,                
@@ -60,7 +74,9 @@ pub struct Certification {
     pub credential_id: String,       
     pub credential_url: String, 
 }
-
+impl Certification {
+    pub const LEN: usize = 4 + 100 + 4 + 100 + 8 + 8 + 4 + 100 + 4 + 200;
+}
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct PortfolioItem {
     pub title: String,               
@@ -68,7 +84,9 @@ pub struct PortfolioItem {
     pub url: String,                 
     pub image_url: String, 
 }
-
+impl PortfolioItem {
+    pub const LEN: usize = 4 + 100 + 4 + 500 + 4 + 200 + 4 + 200;
+}
 // ALl related to Jobs
 #[account]
 pub struct Job {

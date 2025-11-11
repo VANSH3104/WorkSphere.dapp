@@ -36,7 +36,6 @@ import { Textarea } from "@/app/(module)/ui/textarea";
 import { Badge } from "@/app/(module)/ui/badge";
 import { useWallet } from "@solana/wallet-adapter-react";
 
-
 // Type definitions
 interface Education {
   institution: string;
@@ -110,8 +109,8 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
   const [isEditing, setIsEditing] = useState(!initialUserData?.resume);
   const [activeTab, setActiveTab] = useState("overview");
   const [userRole, setUserRole] = useState<"freelancer" | "client">(role);
-  const { wallet , publicKey } = useWallet();
-  console.log(publicKey , "user")
+  const { wallet, publicKey } = useWallet();
+  
   // Default resume structure
   const defaultResume: Resume = {
     education: [],
@@ -124,21 +123,21 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
   // Default user data structure
   const defaultUserData: UserData = {
-    authority: "9sR5S...8Hd3k",
+    authority: publicKey?.toString() || "",
     name: "John Doe",
     is_client: role === "client",
     is_freelancer: role === "freelancer",
-    reputation: 92,
-    completed_jobs: 47,
+    reputation: 50,
+    completed_jobs: 0,
     created_at: Math.floor(Date.now() / 1000),
     resume: defaultResume,
-    disputes_raised: 2,
-    disputes_resolved: 1,
-    total_earnings: 1247000000,
-    total_spent: 567000000,
-    active_jobs: 3,
-    pending_jobs: 2,
-    cancelled_jobs: 5
+    disputes_raised: 0,
+    disputes_resolved: 0,
+    total_earnings: 0,
+    total_spent: 0,
+    active_jobs: 0,
+    pending_jobs: 0,
+    cancelled_jobs: 0
   };
 
   const [userData, setUserData] = useState<UserData>(initialUserData || defaultUserData);
@@ -203,11 +202,12 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
     }
   };
 
+  // Education handlers
   const handleAddEducation = (): void => {
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       education: [
-        ...(editableResume?.education || []),
+        ...prev.education,
         {
           institution: "",
           degree: "",
@@ -218,35 +218,36 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           description: ""
         }
       ]
-    });
+    }));
   };
 
   const handleRemoveEducation = (index: number): void => {
-    const newEducation = [...(editableResume?.education || [])];
+    const newEducation = [...editableResume.education];
     newEducation.splice(index, 1);
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       education: newEducation
-    });
+    }));
   };
 
   const handleEducationChange = (index: number, field: keyof Education, value: string | number | null): void => {
-    const newEducation = [...(editableResume?.education || [])];
+    const newEducation = [...editableResume.education];
     newEducation[index] = {
       ...newEducation[index],
       [field]: value
     };
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       education: newEducation
-    });
+    }));
   };
 
+  // Experience handlers
   const handleAddExperience = (): void => {
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       experience: [
-        ...(editableResume?.experience || []),
+        ...prev.experience,
         {
           company: "",
           position: "",
@@ -255,60 +256,62 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           responsibilities: ""
         }
       ]
-    });
+    }));
   };
 
   const handleRemoveExperience = (index: number): void => {
-    const newExperience = [...(editableResume?.experience || [])];
+    const newExperience = [...editableResume.experience];
     newExperience.splice(index, 1);
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       experience: newExperience
-    });
+    }));
   };
 
   const handleExperienceChange = (index: number, field: keyof Experience, value: string | number | null): void => {
-    const newExperience = [...(editableResume?.experience || [])];
+    const newExperience = [...editableResume.experience];
     newExperience[index] = {
       ...newExperience[index],
       [field]: value
     };
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       experience: newExperience
-    });
+    }));
   };
 
+  // Skills handlers
   const handleAddSkill = (): void => {
-    setEditableResume({
-      ...editableResume,
-      skills: [...(editableResume?.skills || []), ""]
-    });
+    setEditableResume(prev => ({
+      ...prev,
+      skills: [...prev.skills, ""]
+    }));
   };
 
   const handleRemoveSkill = (index: number): void => {
-    const newSkills = [...(editableResume?.skills || [])];
+    const newSkills = [...editableResume.skills];
     newSkills.splice(index, 1);
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       skills: newSkills
-    });
+    }));
   };
 
   const handleSkillChange = (index: number, value: string): void => {
-    const newSkills = [...(editableResume?.skills || [])];
+    const newSkills = [...editableResume.skills];
     newSkills[index] = value;
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       skills: newSkills
-    });
+    }));
   };
 
+  // Certification handlers
   const handleAddCertification = (): void => {
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       certifications: [
-        ...(editableResume?.certifications || []),
+        ...prev.certifications,
         {
           name: "",
           issuing_organization: "",
@@ -318,35 +321,36 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           credential_url: ""
         }
       ]
-    });
+    }));
   };
 
   const handleRemoveCertification = (index: number): void => {
-    const newCertifications = [...(editableResume?.certifications || [])];
+    const newCertifications = [...editableResume.certifications];
     newCertifications.splice(index, 1);
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       certifications: newCertifications
-    });
+    }));
   };
 
   const handleCertificationChange = (index: number, field: keyof Certification, value: string | number | null): void => {
-    const newCertifications = [...(editableResume?.certifications || [])];
+    const newCertifications = [...editableResume.certifications];
     newCertifications[index] = {
       ...newCertifications[index],
       [field]: value
     };
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       certifications: newCertifications
-    });
+    }));
   };
 
+  // Portfolio handlers
   const handleAddPortfolio = (): void => {
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       portfolio: [
-        ...(editableResume?.portfolio || []),
+        ...prev.portfolio,
         {
           title: "",
           description: "",
@@ -354,91 +358,183 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           image_url: ""
         }
       ]
-    });
+    }));
   };
 
   const handleRemovePortfolio = (index: number): void => {
-    const newPortfolio = [...(editableResume?.portfolio || [])];
+    const newPortfolio = [...editableResume.portfolio];
     newPortfolio.splice(index, 1);
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       portfolio: newPortfolio
-    });
+    }));
   };
 
   const handlePortfolioChange = (index: number, field: keyof PortfolioItem, value: string): void => {
-    const newPortfolio = [...(editableResume?.portfolio || [])];
+    const newPortfolio = [...editableResume.portfolio];
     newPortfolio[index] = {
       ...newPortfolio[index],
       [field]: value
     };
-    setEditableResume({
-      ...editableResume,
+    setEditableResume(prev => ({
+      ...prev,
       portfolio: newPortfolio
-    });
+    }));
   };
 
-  
+  // Blockchain submission with proper error handling
   const handleSubmitToBlockchain = async () => {
     try {
-      const program = getProgram(wallet?.adapter);
-      const [userPDA] = findUserPDA(wallet.adapter.publicKey); 
+      if (!wallet?.adapter?.publicKey) {
+        alert("Please connect your wallet first!");
+        return;
+      }
+
+      const program = getProgram(wallet.adapter);
+      const [userPDA] = findUserPDA(wallet.adapter.publicKey);
       
-      // CORRECT structure with proper types and last_update field
-      const resume = {
-        education: (editableResume.education || []).map(edu => ({
-          institution: edu.institution || "",
-          degree: edu.degree || "",
-          field_of_study: edu.field_of_study || "",
-          start_date: new BN(edu.start_date || 0),  // Use BN for numbers
-          end_date: new BN(edu.end_date || 0),      // Use BN for numbers
-          grade: edu.grade || "",
-          description: edu.description || ""
-        })),
-        experience: (editableResume.experience || []).map(exp => ({
-          company: exp.company || "",
-          position: exp.position || "",
-          start_date: new BN(exp.start_date || 0),  // Use BN for numbers
-          end_date: new BN(exp.end_date || 0),      // Use BN for numbers
-          responsibilities: exp.responsibilities || ""
-        })),
-        skills: editableResume.skills || [],
-        certifications: (editableResume.certifications || []).map(cert => ({
-          name: cert.name || "",
-          issuing_organization: cert.issuing_organization || "",
-          issue_date: new BN(cert.issue_date || 0),        // Use BN for numbers
-          expiration_date: new BN(cert.expiration_date || 0), // Use BN for numbers
-          credential_id: cert.credential_id || "",
-          credential_url: cert.credential_url || ""
-        })),
-        portfolio: (editableResume.portfolio || []).map(item => ({
-          title: item.title || "",
-          description: item.description || "",
-          url: item.url || "",
-          image_url: item.image_url || ""
-        })),
-        last_update: new BN(Math.floor(Date.now() / 1000))  // REQUIRED field!
+      // Check if user account exists first
+      try {
+        await program.account.user.fetch(userPDA);
+        console.log("✅ User account found");
+      } catch (e) {
+        alert("User account not found. Please register first!");
+        return;
+      }
+
+      // Reasonable limits for blockchain storage
+      const MAX_LIMITS = {
+        education: 3,
+        experience: 3,
+        skills: 10,
+        certifications: 3,
+        portfolio: 3
       };
-  
-      console.log("📝 Prepared resume:", resume);
-  
+
+      // Safe truncate function
+      const truncate = (str: string, maxLen: number): string => {
+        if (!str) return "";
+        const trimmed = str.trim();
+        return trimmed.length > maxLen ? trimmed.substring(0, maxLen) : trimmed;
+      };
+
+      // Prepare resume data with proper formatting
+      const resumeData = {
+        education: editableResume.education
+          .filter(edu => edu.institution && edu.degree)
+          .slice(0, MAX_LIMITS.education)
+          .map(edu => ({
+            institution: truncate(edu.institution, 50),
+            degree: truncate(edu.degree, 50),
+            field_of_study: truncate(edu.field_of_study, 50),
+            start_date: new BN(edu.start_date || Math.floor(Date.now() / 1000)),
+            end_date: new BN(edu.end_date || Math.floor(Date.now() / 1000)),
+            grade: truncate(edu.grade, 20),
+            description: truncate(edu.description, 200)
+          })),
+        experience: editableResume.experience
+          .filter(exp => exp.company && exp.position)
+          .slice(0, MAX_LIMITS.experience)
+          .map(exp => ({
+            company: truncate(exp.company, 50),
+            position: truncate(exp.position, 50),
+            start_date: new BN(exp.start_date || Math.floor(Date.now() / 1000)),
+            end_date: new BN(exp.end_date || Math.floor(Date.now() / 1000)),
+            responsibilities: truncate(exp.responsibilities, 300)
+          })),
+        skills: editableResume.skills
+          .filter(skill => skill && skill.trim())
+          .slice(0, MAX_LIMITS.skills)
+          .map(skill => truncate(skill, 50)),
+        certifications: editableResume.certifications
+          .filter(cert => cert.name)
+          .slice(0, MAX_LIMITS.certifications)
+          .map(cert => ({
+            name: truncate(cert.name, 50),
+            issuing_organization: truncate(cert.issuing_organization, 50),
+            issue_date: new BN(cert.issue_date || Math.floor(Date.now() / 1000)),
+            expiration_date: new BN(cert.expiration_date || Math.floor(Date.now() / 1000)),
+            credential_id: truncate(cert.credential_id, 50),
+            credential_url: truncate(cert.credential_url, 100)
+          })),
+        portfolio: editableResume.portfolio
+          .filter(item => item.title)
+          .slice(0, MAX_LIMITS.portfolio)
+          .map(item => ({
+            title: truncate(item.title, 50),
+            description: truncate(item.description, 200),
+            url: truncate(item.url, 100),
+            image_url: truncate(item.image_url, 100)
+          })),
+        last_update: new BN(Math.floor(Date.now() / 1000))
+      };
+
+      console.log("📝 Prepared resume data:", resumeData);
+
+      // Validate we have at least some data
+      if (resumeData.education.length === 0 && resumeData.experience.length === 0 && resumeData.skills.length === 0) {
+        alert("Please add at least some education, experience, or skills before submitting to blockchain.");
+        return;
+      }
+
+      // Warn about truncation
+      const truncatedItems = [];
+      if (editableResume.education.length > MAX_LIMITS.education) {
+        truncatedItems.push(`${editableResume.education.length - MAX_LIMITS.education} education entries`);
+      }
+      if (editableResume.experience.length > MAX_LIMITS.experience) {
+        truncatedItems.push(`${editableResume.experience.length - MAX_LIMITS.experience} experience entries`);
+      }
+      if (editableResume.skills.length > MAX_LIMITS.skills) {
+        truncatedItems.push(`${editableResume.skills.length - MAX_LIMITS.skills} skills`);
+      }
+      
+      if (truncatedItems.length > 0) {
+        const confirmed = window.confirm(
+          `Note: Due to blockchain size limits, some items will be truncated:\n- ${truncatedItems.join('\n- ')}\n\nContinue?`
+        );
+        if (!confirmed) return;
+      }
+
+      console.log("🚀 Sending transaction...");
       const txSig = await program.methods
-        .updateResume(resume)
+        .updateResume(resumeData)
         .accounts({
           user: userPDA,
           authority: wallet.adapter.publicKey,
         })
         .rpc();
-  
+
       console.log("✅ Resume updated successfully:", txSig);
-      alert("Resume successfully updated on blockchain!");
-  
-    } catch (error) {
+      alert(`Resume successfully updated on blockchain!\n\nTransaction: ${txSig}`);
+      
+      // Update local state
+      handleSaveChanges();
+
+    } catch (error: any) {
       console.error("❌ Error submitting to blockchain:", error);
-      alert("Failed to submit resume to blockchain.");
+      
+      let errorMsg = "Failed to submit resume to blockchain.\n\n";
+      
+      if (error.message?.includes("indeterminate span")) {
+        errorMsg += "Data structure issue. Please try with fewer items or shorter text.";
+      } else if (error.message?.includes("Transaction too large")) {
+        errorMsg += "The data is too large. Please reduce the number of items.";
+      } else if (error.message?.includes("Account does not exist")) {
+        errorMsg += "User account not found. Please register first!";
+      } else if (error.message) {
+        errorMsg += "Error: " + error.message;
+      }
+      
+      // Show error logs if available
+      if (error.logs && error.logs.length > 0) {
+        console.log("📋 Transaction logs:", error.logs);
+        errorMsg += "\n\nCheck browser console for detailed logs.";
+      }
+      
+      alert(errorMsg);
     }
   };
-
 
   const stats = [
     {
@@ -471,7 +567,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
   const renderResumeSection = () => {
     return (
       <div className="space-y-6">
-        {/* Education */}
+        {/* Education Section */}
         <Card className="glass-card border-2 border-border/50">
           <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -486,24 +582,26 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
             )}
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            {(editableResume?.education || []).map((edu, index) => (
+            {editableResume.education.map((edu, index) => (
               <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Institution</label>
+                        <label className="text-sm font-medium text-foreground">Institution *</label>
                         <Input 
-                          value={edu.institution || ""} 
+                          value={edu.institution} 
                           onChange={(e) => handleEducationChange(index, 'institution', e.target.value)}
+                          placeholder="University Name"
                           className="bg-background/50"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Degree</label>
+                        <label className="text-sm font-medium text-foreground">Degree *</label>
                         <Input 
-                          value={edu.degree || ""} 
+                          value={edu.degree} 
                           onChange={(e) => handleEducationChange(index, 'degree', e.target.value)}
+                          placeholder="Bachelor's Degree"
                           className="bg-background/50"
                         />
                       </div>
@@ -511,8 +609,9 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Field of Study</label>
                       <Input 
-                        value={edu.field_of_study || ""} 
+                        value={edu.field_of_study} 
                         onChange={(e) => handleEducationChange(index, 'field_of_study', e.target.value)}
+                        placeholder="Computer Science"
                         className="bg-background/50"
                       />
                     </div>
@@ -548,7 +647,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                               className="w-full justify-start text-left font-normal bg-background/50"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {edu.end_date ? format(new Date(edu.end_date * 1000), "PPP") : "Pick a date"}
+                              {edu.end_date ? format(new Date(edu.end_date * 1000), "PPP") : "Present"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
@@ -565,16 +664,18 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Grade</label>
                       <Input 
-                        value={edu.grade || ""} 
+                        value={edu.grade} 
                         onChange={(e) => handleEducationChange(index, 'grade', e.target.value)}
+                        placeholder="GPA or Grade"
                         className="bg-background/50"
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Description</label>
                       <Textarea 
-                        value={edu.description || ""} 
+                        value={edu.description} 
                         onChange={(e) => handleEducationChange(index, 'description', e.target.value)}
+                        placeholder="Description of your education..."
                         className="bg-background/50 min-h-[80px]"
                       />
                     </div>
@@ -602,7 +703,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                 )}
               </div>
             ))}
-            {(editableResume?.education || []).length === 0 && !isEditing && (
+            {editableResume.education.length === 0 && !isEditing && (
               <div className="text-center py-8 border-2 border-dashed border-border/30 rounded-lg">
                 <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                 <p className="text-foreground-muted">No education information added yet.</p>
@@ -615,7 +716,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           </CardContent>
         </Card>
 
-        {/* Experience */}
+        {/* Experience Section */}
         <Card className="glass-card border-2 border-border/50">
           <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -630,24 +731,26 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
             )}
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            {(editableResume?.experience || []).map((exp, index) => (
+            {editableResume.experience.map((exp, index) => (
               <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Company</label>
+                        <label className="text-sm font-medium text-foreground">Company *</label>
                         <Input 
-                          value={exp.company || ""} 
+                          value={exp.company} 
                           onChange={(e) => handleExperienceChange(index, 'company', e.target.value)}
+                          placeholder="Company Name"
                           className="bg-background/50"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Position</label>
+                        <label className="text-sm font-medium text-foreground">Position *</label>
                         <Input 
-                          value={exp.position || ""} 
+                          value={exp.position} 
                           onChange={(e) => handleExperienceChange(index, 'position', e.target.value)}
+                          placeholder="Job Title"
                           className="bg-background/50"
                         />
                       </div>
@@ -701,10 +804,10 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Responsibilities</label>
                       <Textarea 
-                        value={exp.responsibilities || ""} 
+                        value={exp.responsibilities} 
                         onChange={(e) => handleExperienceChange(index, 'responsibilities', e.target.value)}
-                        className="bg-background/50 min-h-[100px]"
                         placeholder="Describe your key responsibilities and achievements..."
+                        className="bg-background/50 min-h-[100px]"
                       />
                     </div>
                     <Button variant="destructive" size="sm" onClick={() => handleRemoveExperience(index)} className="gap-2">
@@ -730,7 +833,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                 )}
               </div>
             ))}
-            {(editableResume?.experience || []).length === 0 && !isEditing && (
+            {editableResume.experience.length === 0 && !isEditing && (
               <div className="text-center py-8 border-2 border-dashed border-border/30 rounded-lg">
                 <Building className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                 <p className="text-foreground-muted">No experience information added yet.</p>
@@ -743,7 +846,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           </CardContent>
         </Card>
 
-        {/* Skills */}
+        {/* Skills Section */}
         <Card className="glass-card border-2 border-border/50">
           <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -760,7 +863,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           <CardContent className="pt-6">
             {isEditing ? (
               <div className="space-y-4">
-                {(editableResume?.skills || []).map((skill, index) => (
+                {editableResume.skills.map((skill, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <Input 
                       value={skill} 
@@ -773,7 +876,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                     </Button>
                   </div>
                 ))}
-                {(editableResume?.skills || []).length === 0 && (
+                {editableResume.skills.length === 0 && (
                   <div className="text-center py-6">
                     <TrendingUp className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-foreground-muted">No skills added yet. Click "Add Skill" to get started.</p>
@@ -782,12 +885,12 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
               </div>
             ) : (
               <div className="flex flex-wrap gap-3">
-                {(editableResume?.skills || []).map((skill, index) => (
+                {editableResume.skills.map((skill, index) => (
                   <Badge key={index} variant="secondary" className="text-sm px-3 py-2 bg-primary/10 text-primary border-primary/20">
                     {skill}
                   </Badge>
                 ))}
-                {(editableResume?.skills || []).length === 0 && (
+                {editableResume.skills.length === 0 && (
                   <div className="text-center w-full py-6">
                     <TrendingUp className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-foreground-muted">No skills added yet.</p>
@@ -802,7 +905,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           </CardContent>
         </Card>
 
-        {/* Certifications */}
+        {/* Certifications Section */}
         <Card className="glass-card border-2 border-border/50">
           <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -817,24 +920,24 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
             )}
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            {(editableResume?.certifications || []).map((cert, index) => (
+            {editableResume.certifications.map((cert, index) => (
               <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Certification Name</label>
+                        <label className="text-sm font-medium text-foreground">Certification Name *</label>
                         <Input 
-                          value={cert.name || ""} 
+                          value={cert.name} 
                           onChange={(e) => handleCertificationChange(index, 'name', e.target.value)}
                           placeholder="e.g., AWS Solutions Architect"
                           className="bg-background/50"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Issuing Organization</label>
+                        <label className="text-sm font-medium text-foreground">Issuing Organization *</label>
                         <Input 
-                          value={cert.issuing_organization || ""} 
+                          value={cert.issuing_organization} 
                           onChange={(e) => handleCertificationChange(index, 'issuing_organization', e.target.value)}
                           placeholder="e.g., Amazon Web Services"
                           className="bg-background/50"
@@ -891,7 +994,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Credential ID (Optional)</label>
                         <Input 
-                          value={cert.credential_id || ""} 
+                          value={cert.credential_id} 
                           onChange={(e) => handleCertificationChange(index, 'credential_id', e.target.value)}
                           placeholder="e.g., ABC-123-XYZ"
                           className="bg-background/50"
@@ -900,7 +1003,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Credential URL (Optional)</label>
                         <Input 
-                          value={cert.credential_url || ""} 
+                          value={cert.credential_url} 
                           onChange={(e) => handleCertificationChange(index, 'credential_url', e.target.value)}
                           placeholder="https://..."
                           className="bg-background/50"
@@ -943,7 +1046,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                 )}
               </div>
             ))}
-            {(editableResume?.certifications || []).length === 0 && !isEditing && (
+            {editableResume.certifications.length === 0 && !isEditing && (
               <div className="text-center py-8 border-2 border-dashed border-border/30 rounded-lg">
                 <Award className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                 <p className="text-foreground-muted">No certifications added yet.</p>
@@ -956,7 +1059,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           </CardContent>
         </Card>
 
-        {/* Portfolio */}
+        {/* Portfolio Section */}
         <Card className="glass-card border-2 border-border/50">
           <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -971,14 +1074,14 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
             )}
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            {(editableResume?.portfolio || []).map((item, index) => (
+            {editableResume.portfolio.map((item, index) => (
               <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">Project Title</label>
+                      <label className="text-sm font-medium text-foreground">Project Title *</label>
                       <Input 
-                        value={item.title || ""} 
+                        value={item.title} 
                         onChange={(e) => handlePortfolioChange(index, 'title', e.target.value)}
                         placeholder="e.g., DeFi Lending Protocol"
                         className="bg-background/50"
@@ -987,7 +1090,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Description</label>
                       <Textarea 
-                        value={item.description || ""} 
+                        value={item.description} 
                         onChange={(e) => handlePortfolioChange(index, 'description', e.target.value)}
                         placeholder="Describe your project, technologies used, and your role..."
                         className="bg-background/50 min-h-[100px]"
@@ -997,7 +1100,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Project URL (Optional)</label>
                         <Input 
-                          value={item.url || ""} 
+                          value={item.url} 
                           onChange={(e) => handlePortfolioChange(index, 'url', e.target.value)}
                           placeholder="https://github.com/..."
                           className="bg-background/50"
@@ -1006,7 +1109,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Image URL (Optional)</label>
                         <Input 
-                          value={item.image_url || ""} 
+                          value={item.image_url} 
                           onChange={(e) => handlePortfolioChange(index, 'image_url', e.target.value)}
                           placeholder="https://..."
                           className="bg-background/50"
@@ -1047,7 +1150,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                 )}
               </div>
             ))}
-            {(editableResume?.portfolio || []).length === 0 && !isEditing && (
+            {editableResume.portfolio.length === 0 && !isEditing && (
               <div className="text-center py-8 border-2 border-dashed border-border/30 rounded-lg">
                 <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                 <p className="text-foreground-muted">No portfolio items added yet.</p>
