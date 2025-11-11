@@ -33,40 +33,40 @@ pub struct Resume {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Education {
-    pub institution: Option<String>,
-    pub degree: Option<String>,
-    pub field_of_study: Option<String>,
-    pub start_date: Option<i64>,
-    pub end_date: Option<i64>,
-    pub grade: Option<String>,
-    pub description: Option<String>,
+    pub institution: String,         
+    pub degree: String,                
+    pub field_of_study: String,      
+    pub start_date: i64,
+    pub end_date: i64,
+    pub grade: String,               
+    pub description: String, 
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Experience {
-    pub company: Option<String>,
-    pub position: Option<String>,
-    pub start_date: Option<i64>,
-    pub end_date: Option<i64>,
-    pub responsibilities: Option<String>,
+    pub company: String,             
+    pub position: String,            
+    pub start_date: i64,             
+    pub end_date: i64,               
+    pub responsibilities: String,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Certification {
-    pub name: Option<String>,
-    pub issuing_organization: Option<String>,
-    pub issue_date: Option<i64>,
-    pub expiration_date: Option<i64>,
-    pub credential_id: Option<String>,
-    pub credential_url: Option<String>,
+    pub name: String,                
+    pub issuing_organization: String,  
+    pub issue_date: i64,             
+    pub expiration_date: i64,        
+    pub credential_id: String,       
+    pub credential_url: String, 
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct PortfolioItem {
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub url: Option<String>,
-    pub image_url: Option<String>,
+    pub title: String,               
+    pub description: String,         
+    pub url: String,                 
+    pub image_url: String, 
 }
 
 // ALl related to Jobs

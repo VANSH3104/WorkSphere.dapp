@@ -292,39 +292,27 @@
         "fields": [
           {
             "name": "name",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "issuing_organization",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "issue_date",
-            "type": {
-              "option": "i64"
-            }
+            "type": "i64"
           },
           {
             "name": "expiration_date",
-            "type": {
-              "option": "i64"
-            }
+            "type": "i64"
           },
           {
             "name": "credential_id",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "credential_url",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           }
         ]
       }
@@ -415,45 +403,31 @@
         "fields": [
           {
             "name": "institution",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "degree",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "field_of_study",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "start_date",
-            "type": {
-              "option": "i64"
-            }
+            "type": "i64"
           },
           {
             "name": "end_date",
-            "type": {
-              "option": "i64"
-            }
+            "type": "i64"
           },
           {
             "name": "grade",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "description",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           }
         ]
       }
@@ -465,33 +439,23 @@
         "fields": [
           {
             "name": "company",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "position",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "start_date",
-            "type": {
-              "option": "i64"
-            }
+            "type": "i64"
           },
           {
             "name": "end_date",
-            "type": {
-              "option": "i64"
-            }
+            "type": "i64"
           },
           {
             "name": "responsibilities",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           }
         ]
       }
@@ -648,27 +612,19 @@
         "fields": [
           {
             "name": "title",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "description",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "url",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           },
           {
             "name": "image_url",
-            "type": {
-              "option": "string"
-            }
+            "type": "string"
           }
         ]
       }

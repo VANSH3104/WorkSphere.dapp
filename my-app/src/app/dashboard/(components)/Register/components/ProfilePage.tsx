@@ -4,6 +4,8 @@ import { Calendar } from "@/app/(module)/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/(module)/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
+import { getProgram, findUserPDA } from "@/(anchor)/setup";
+import { BN } from "@coral-xyz/anchor";
 import { 
   User, 
   Briefcase, 
@@ -32,6 +34,7 @@ import { Button } from "@/app/(module)/ui/button";
 import { Input } from "@/app/(module)/ui/input";
 import { Textarea } from "@/app/(module)/ui/textarea";
 import { Badge } from "@/app/(module)/ui/badge";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 
 // Type definitions
@@ -107,7 +110,8 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
   const [isEditing, setIsEditing] = useState(!initialUserData?.resume);
   const [activeTab, setActiveTab] = useState("overview");
   const [userRole, setUserRole] = useState<"freelancer" | "client">(role);
-  
+  const { wallet , publicKey } = useWallet();
+  console.log(publicKey , "user")
   // Default resume structure
   const defaultResume: Resume = {
     education: [],
@@ -374,17 +378,67 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
     });
   };
 
-  const handleSubmitToBlockchain = async (): Promise<void> => {
-    console.log("Submitting resume to blockchain...", editableResume);
-    
+  
+  const handleSubmitToBlockchain = async () => {
     try {
-      // Placeholder for blockchain transaction
-      alert("Blockchain integration coming soon!");
+      const program = getProgram(wallet?.adapter);
+      const [userPDA] = findUserPDA(wallet.adapter.publicKey); 
+      
+      // CORRECT structure with proper types and last_update field
+      const resume = {
+        education: (editableResume.education || []).map(edu => ({
+          institution: edu.institution || "",
+          degree: edu.degree || "",
+          field_of_study: edu.field_of_study || "",
+          start_date: new BN(edu.start_date || 0),  // Use BN for numbers
+          end_date: new BN(edu.end_date || 0),      // Use BN for numbers
+          grade: edu.grade || "",
+          description: edu.description || ""
+        })),
+        experience: (editableResume.experience || []).map(exp => ({
+          company: exp.company || "",
+          position: exp.position || "",
+          start_date: new BN(exp.start_date || 0),  // Use BN for numbers
+          end_date: new BN(exp.end_date || 0),      // Use BN for numbers
+          responsibilities: exp.responsibilities || ""
+        })),
+        skills: editableResume.skills || [],
+        certifications: (editableResume.certifications || []).map(cert => ({
+          name: cert.name || "",
+          issuing_organization: cert.issuing_organization || "",
+          issue_date: new BN(cert.issue_date || 0),        // Use BN for numbers
+          expiration_date: new BN(cert.expiration_date || 0), // Use BN for numbers
+          credential_id: cert.credential_id || "",
+          credential_url: cert.credential_url || ""
+        })),
+        portfolio: (editableResume.portfolio || []).map(item => ({
+          title: item.title || "",
+          description: item.description || "",
+          url: item.url || "",
+          image_url: item.image_url || ""
+        })),
+        last_update: new BN(Math.floor(Date.now() / 1000))  // REQUIRED field!
+      };
+  
+      console.log("📝 Prepared resume:", resume);
+  
+      const txSig = await program.methods
+        .updateResume(resume)
+        .accounts({
+          user: userPDA,
+          authority: wallet.adapter.publicKey,
+        })
+        .rpc();
+  
+      console.log("✅ Resume updated successfully:", txSig);
+      alert("Resume successfully updated on blockchain!");
+  
     } catch (error) {
-      console.error("Error submitting to blockchain:", error);
-      alert("Failed to submit to blockchain");
+      console.error("❌ Error submitting to blockchain:", error);
+      alert("Failed to submit resume to blockchain.");
     }
   };
+
 
   const stats = [
     {
@@ -414,7 +468,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
     }
   ];
 
-  const renderResumeSection = (): JSX.Element => {
+  const renderResumeSection = () => {
     return (
       <div className="space-y-6">
         {/* Education */}

@@ -71,47 +71,23 @@ pub mod backend {
     }
     pub fn update_resume(
         ctx: Context<UpdateResumeCtx>,
-        new_resume: Resume,
+        new_resume: Resume,  // This should match your frontend structure
     ) -> Result<()> {
         let user = &mut ctx.accounts.user;
-
+    
         // Authority check
         require!(user.authority == ctx.accounts.authority.key(), ErrorCode::AuthorityMismatch);
-
-        // Initialize resume if none exists
-        if user.resume.is_none() {
-            user.resume = Some(Resume {
-                education: vec![],
-                experience: vec![],
-                skills: vec![],
-                certifications: vec![],
-                portfolio: vec![],
-                last_update: Clock::get()?.unix_timestamp,
-            });
-        }
-
-        let resume = user.resume.as_mut().unwrap();
-
-        // Update only provided fields
-        if !new_resume.education.is_empty() {
-            resume.education = new_resume.education;
-        }
-        if !new_resume.experience.is_empty() {
-            resume.experience = new_resume.experience;
-        }
-        if !new_resume.skills.is_empty() {
-            resume.skills = new_resume.skills;
-        }
-        if !new_resume.certifications.is_empty() {
-            resume.certifications = new_resume.certifications;
-        }
-        if !new_resume.portfolio.is_empty() {
-            resume.portfolio = new_resume.portfolio;
-        }
-
-        // Always update timestamp
-        resume.last_update = Clock::get()?.unix_timestamp;
-
+    
+        // Simply replace the entire resume - this avoids complex merging logic
+        user.resume = Some(Resume {
+            education: new_resume.education,
+            experience: new_resume.experience,
+            skills: new_resume.skills,
+            certifications: new_resume.certifications,
+            portfolio: new_resume.portfolio,
+            last_update: Clock::get()?.unix_timestamp,
+        });
+    
         msg!("Resume updated for {}", user.authority);
         Ok(())
     }
