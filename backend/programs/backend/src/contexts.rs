@@ -21,15 +21,28 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct UpdateUserInfo<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"user", authority.key().as_ref()],
+        bump,
+        constraint = user.authority == authority.key(),
+    )]
     pub user: Account<'info, User>,
+    
     pub authority: Signer<'info>,
 }
 
+
 #[derive(Accounts)]
 pub struct UpdateResumeCtx<'info> {
-    #[account(mut)]
-    pub user: Account<'info, User>, 
+    #[account(
+        mut,
+        seeds = [b"user", authority.key().as_ref()],
+        bump,
+        constraint = user.authority == authority.key(),
+    )]
+    pub user: Account<'info, User>,
+    
     pub authority: Signer<'info>,
 }
 

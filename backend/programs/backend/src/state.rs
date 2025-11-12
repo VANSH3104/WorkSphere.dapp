@@ -1,5 +1,9 @@
 use anchor_lang::prelude::*;
-
+pub const MAX_EDUCATION: usize = 3;
+pub const MAX_EXPERIENCE: usize = 3;
+pub const MAX_SKILLS: usize = 10;
+pub const MAX_CERTIFICATIONS: usize = 3;
+pub const MAX_PORTFOLIO: usize = 3;
 #[account]
 pub struct User{
     pub authority: Pubkey,
@@ -32,12 +36,12 @@ pub struct Resume {
 }
 impl Resume {
     pub const LEN: usize = 
-        4 + (5 * Education::LEN) +    // education vector
-        4 + (5 * Experience::LEN) +   // experience vector  
-        4 + (20 * 50) +               // skills vector (20 skills * 50 chars each)
-        4 + (5 * Certification::LEN) + // certifications vector
-        4 + (5 * PortfolioItem::LEN) + // portfolio vector
-        8;                            // last_update
+        4 + (MAX_EDUCATION * Education::LEN) +
+        4 + (MAX_EXPERIENCE * Experience::LEN) +
+        4 + (MAX_SKILLS * (4 + 50)) + // Vec<String> with max 50 chars each
+        4 + (MAX_CERTIFICATIONS * Certification::LEN) +
+        4 + (MAX_PORTFOLIO * PortfolioItem::LEN) +
+        8;
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -51,7 +55,13 @@ pub struct Education {
     pub description: String, 
 }
 impl Education {
-    pub const LEN: usize = 4 + 100 + 4 + 100 + 4 + 100 + 8 + 8 + 4 + 50 + 4 + 500;
+    pub const LEN: usize = 
+        4 + 50 + // institution (reduced from 100)
+        4 + 50 + // degree
+        4 + 50 + // field_of_study
+        8 + 8 + // dates
+        4 + 20 + // grade
+        4 + 200; // description
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -63,7 +73,11 @@ pub struct Experience {
     pub responsibilities: String,
 }
 impl Experience {
-    pub const LEN: usize = 4 + 100 + 4 + 100 + 8 + 8 + 4 + 1000;
+    pub const LEN: usize = 
+        4 + 50 + // company
+        4 + 50 + // position
+        8 + 8 + // dates
+        4 + 300; // responsibilities (reduced from 1000)
 }
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Certification {
@@ -75,8 +89,14 @@ pub struct Certification {
     pub credential_url: String, 
 }
 impl Certification {
-    pub const LEN: usize = 4 + 100 + 4 + 100 + 8 + 8 + 4 + 100 + 4 + 200;
+    pub const LEN: usize = 
+        4 + 50 + // name
+        4 + 50 + // issuing_organization
+        8 + 8 + // dates
+        4 + 50 + // credential_id
+        4 + 100; // credential_url
 }
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct PortfolioItem {
     pub title: String,               
@@ -85,7 +105,11 @@ pub struct PortfolioItem {
     pub image_url: String, 
 }
 impl PortfolioItem {
-    pub const LEN: usize = 4 + 100 + 4 + 500 + 4 + 200 + 4 + 200;
+    pub const LEN: usize = 
+        4 + 50 + // title
+        4 + 200 + // description
+        4 + 100 + // url
+        4 + 100; // image_url
 }
 // ALl related to Jobs
 #[account]

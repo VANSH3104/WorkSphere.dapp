@@ -45,52 +45,68 @@ pub mod backend {
     }
 
     pub fn update_user_info(
-        ctx: Context<UpdateUserInfo>,
-        new_name: Option<String>,
-        new_is_client: Option<bool>,
-        new_is_freelancer: Option<bool>,
-    ) -> Result<()> {
-        let user = &mut ctx.accounts.user;
-
-        // Authority check
-        require!(user.authority == ctx.accounts.authority.key(), ErrorCode::AuthorityMismatch);
-
-        // Update only provided fields
-        if let Some(name) = new_name {
-            user.name = name;
-        }
-        if let Some(is_client) = new_is_client {
-            user.is_client = is_client;
-        }
-        if let Some(is_freelancer) = new_is_freelancer {
-            user.is_freelancer = is_freelancer;
-        }
-
-        msg!("User info updated for {}", user.authority);
-        Ok(())
+            ctx: Context<UpdateUserInfo>,
+            new_name: Option<String>,
+            new_is_client: Option<bool>,
+            new_is_freelancer: Option<bool>,
+        ) -> Result<()> {
+            let user = &mut ctx.accounts.user;
+    
+            if let Some(name) = new_name {
+                user.name = name;
+            }
+            if let Some(is_client) = new_is_client {
+                user.is_client = is_client;
+            }
+            if let Some(is_freelancer) = new_is_freelancer {
+                user.is_freelancer = is_freelancer;
+            }
+    
+            msg!("User info updated for {}", user.authority);
+            Ok(())
     }
     pub fn update_resume(
-        ctx: Context<UpdateResumeCtx>,
-        new_resume: Resume,  // This should match your frontend structure
-    ) -> Result<()> {
-        let user = &mut ctx.accounts.user;
+            ctx: Context<UpdateResumeCtx>,
+            new_resume: Resume,
+        ) -> Result<()> {
+            let user = &mut ctx.accounts.user;
+            
+            // Validate vector sizes
+            require!(
+                new_resume.education.len() <= MAX_EDUCATION,
+                ErrorCode::TooManyEducationEntries
+            );
+            require!(
+                new_resume.experience.len() <= MAX_EXPERIENCE,
+                ErrorCode::TooManyExperienceEntries
+            );
+            require!(
+                new_resume.skills.len() <= MAX_SKILLS,
+                ErrorCode::TooManySkills
+            );
+            require!(
+                new_resume.certifications.len() <= MAX_CERTIFICATIONS,
+                ErrorCode::TooManyCertifications
+            );
+            require!(
+                new_resume.portfolio.len() <= MAX_PORTFOLIO,
+                ErrorCode::TooManyPortfolioItems
+            );
     
-        // Authority check
-        require!(user.authority == ctx.accounts.authority.key(), ErrorCode::AuthorityMismatch);
+            // Update resume
+            user.resume = Some(Resume {
+                education: new_resume.education,
+                experience: new_resume.experience,
+                skills: new_resume.skills,
+                certifications: new_resume.certifications,
+                portfolio: new_resume.portfolio,
+                last_update: Clock::get()?.unix_timestamp,
+            });
     
-        // Simply replace the entire resume - this avoids complex merging logic
-        user.resume = Some(Resume {
-            education: new_resume.education,
-            experience: new_resume.experience,
-            skills: new_resume.skills,
-            certifications: new_resume.certifications,
-            portfolio: new_resume.portfolio,
-            last_update: Clock::get()?.unix_timestamp,
-        });
-    
-        msg!("Resume updated for {}", user.authority);
-        Ok(())
-    }
+            msg!("Resume updated for {}", user.authority);
+            Ok(())
+        }
+
 
     pub fn create_job(
         ctx: Context<CreateJob>,

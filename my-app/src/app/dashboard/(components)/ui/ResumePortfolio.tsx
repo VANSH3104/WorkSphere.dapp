@@ -66,13 +66,45 @@ export const ResumePortfolio = ({ userRole, user, onUserUpdate }: ResumePortfoli
     }
   };
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return "Present";
-    return new Date(timestamp * 1000).toLocaleDateString('en-US', { 
-      month: 'short', 
-      year: 'numeric' 
-    });
+  // FIXED: Proper date formatting function
+  const formatDate = (timestamp: number): string => {
+    // Check if timestamp is invalid, zero, or represents "present"
+    if (!timestamp || timestamp === 0 || timestamp < 31536000) { // 31536000 = 1 year in seconds
+      return "Present";
+    }
+    
+    try {
+      // Convert Unix timestamp (seconds) to milliseconds
+      const date = new Date(timestamp * 1000);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "Present";
+      }
+      
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        year: 'numeric' 
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error, timestamp);
+      return "Present";
+    }
   };
+
+  // FIXED: Format date range properly
+  const formatDateRange = (startDate: number, endDate: number): string => {
+    const start = formatDate(startDate);
+    const end = formatDate(endDate);
+    
+    if (start === end) {
+      return start;
+    }
+    
+    return `${start} - ${end}`;
+  };
+
+  console.log(user, "user");
 
   // Handle user profile update
   const handleProfileUpdate = (updatedData) => {
@@ -98,7 +130,12 @@ export const ResumePortfolio = ({ userRole, user, onUserUpdate }: ResumePortfoli
   }
 
   // If no resume exists, show create prompt
-  if (!sanitizedUser?.resume || !sanitizedUser.resume.education || sanitizedUser.resume.education.length === 0) {
+  if (!sanitizedUser?.resume || 
+      (!sanitizedUser.resume.education || sanitizedUser.resume.education.length === 0) &&
+      (!sanitizedUser.resume.experience || sanitizedUser.resume.experience.length === 0) &&
+      (!sanitizedUser.resume.skills || sanitizedUser.resume.skills.length === 0) &&
+      (!sanitizedUser.resume.certifications || sanitizedUser.resume.certifications.length === 0) &&
+      (!sanitizedUser.resume.portfolio || sanitizedUser.resume.portfolio.length === 0)) {
     return (
       <motion.div
         className="glass-card p-6 flex flex-col items-center justify-center text-center"
@@ -224,7 +261,8 @@ export const ResumePortfolio = ({ userRole, user, onUserUpdate }: ResumePortfoli
                         )}
                         <div className="flex items-center text-foreground-muted text-sm mt-1">
                           <Calendar className="w-3 h-3 mr-1" />
-                          {formatDate(edu.start_date)} - {formatDate(edu.end_date)}
+                          {/* FIXED: Use the improved date range formatter */}
+                          {formatDateRange(edu.startDate, edu.endDate)}
                         </div>
                         {edu.description && (
                           <p className="text-foreground-muted text-sm mt-2">{edu.description}</p>
@@ -257,8 +295,9 @@ export const ResumePortfolio = ({ userRole, user, onUserUpdate }: ResumePortfoli
                       >
                         <div className="flex justify-between items-start mb-2">
                           <h4 className="font-semibold text-foreground">{exp.position}</h4>
+                          {/* FIXED: Use the improved date range formatter */}
                           <Badge variant="secondary">
-                            {formatDate(exp.start_date)} - {formatDate(exp.end_date)}
+                            {formatDateRange(exp.startDate, exp.endDate)}
                           </Badge>
                         </div>
                         <p className="text-neon-purple font-medium">{exp.company}</p>
@@ -328,9 +367,16 @@ export const ResumePortfolio = ({ userRole, user, onUserUpdate }: ResumePortfoli
                           )}
                         </div>
                         <p className="text-neon-gold">{cert.issuing_organization}</p>
-                        <p className="text-foreground-muted text-sm">
-                          {formatDate(cert.issue_date)}
-                        </p>
+                        {/* FIXED: Show issue date properly */}
+                        <div className="flex items-center text-foreground-muted text-sm mt-1">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Issued: {formatDate(cert.issue_date)}
+                          {cert.expiration_date && cert.expiration_date > 0 && (
+                            <span className="ml-2">
+                              • Expires: {formatDate(cert.expiration_date)}
+                            </span>
+                          )}
+                        </div>
                         {cert.credential_url && (
                           <a 
                             href={cert.credential_url}

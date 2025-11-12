@@ -27,22 +27,28 @@ import {
   CheckCircle,
   AlertCircle,
   Plus,
-  Trash2
+  Trash2,
+  Play,
+  Pause,
+  SkipForward,
+  Zap,
+  Package
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/(module)/ui/card";
 import { Button } from "@/app/(module)/ui/button";
 import { Input } from "@/app/(module)/ui/input";
 import { Textarea } from "@/app/(module)/ui/textarea";
 import { Badge } from "@/app/(module)/ui/badge";
+import { Progress } from "@/app/(module)/ui/progress";
 import { useWallet } from "@solana/wallet-adapter-react";
 
-// Type definitions
+// Type definitions - PERFECTLY MATCHING YOUR RUST BACKEND (snake_case)
 interface Education {
   institution: string;
   degree: string;
-  field_of_study: string;
-  start_date: number | null;
-  end_date: number | null;
+  fieldOfStudy: string;
+  startDate: number;
+  endDate: number;
   grade: string;
   description: string;
 }
@@ -50,16 +56,16 @@ interface Education {
 interface Experience {
   company: string;
   position: string;
-  start_date: number | null;
-  end_date: number | null;
+  startDate: number;
+  endDate: number;
   responsibilities: string;
 }
 
 interface Certification {
   name: string;
   issuing_organization: string;
-  issue_date: number | null;
-  expiration_date: number | null;
+  issue_date: number;
+  expiration_date: number;
   credential_id: string;
   credential_url: string;
 }
@@ -68,7 +74,7 @@ interface PortfolioItem {
   title: string;
   description: string;
   url: string;
-  image_url: string;
+  imageUrl: string;
 }
 
 interface Resume {
@@ -88,7 +94,7 @@ interface UserData {
   reputation: number;
   completed_jobs: number;
   created_at: number;
-  resume: Resume;
+  resume: Resume | null;
   disputes_raised: number;
   disputes_resolved: number;
   total_earnings: number;
@@ -111,7 +117,11 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
   const [userRole, setUserRole] = useState<"freelancer" | "client">(role);
   const { wallet, publicKey } = useWallet();
   
-  // Default resume structure
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [currentStep, setCurrentStep] = useState<string>("");
+
+  // Default resume structure - MATCHING RUST BACKEND
   const defaultResume: Resume = {
     education: [],
     experience: [],
@@ -159,13 +169,219 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
     }
   }, [initialUserData]);
 
-  const formatDate = (timestamp: number | null): string => {
-    if (!timestamp) return "Present";
-    return new Date(timestamp * 1000).toLocaleDateString();
+  // FIXED: Data preparation that EXACTLY matches Rust structure
+  const prepareForBlockchain = (resume: Resume) => {
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    
+    // Use snake_case to match Rust exactly
+    const blockchainResume = {
+      education: resume.education.map(edu => ({
+        institution: edu.institution.substring(0, 50),
+        degree: edu.degree.substring(0, 50),
+        fieldOfStudy: edu.fieldOfStudy.substring(0, 50), // snake_case
+        startDate: new BN(edu.startDate > 0 ? edu.startDate : currentTimestamp),
+        endDate: new BN(edu.endDate > 0 ? edu.endDate : 0),
+        grade: edu.grade.substring(0, 20),
+        description: edu.description.substring(0, 200)
+      })),
+      experience: resume.experience.map(exp => ({
+        company: exp.company.substring(0, 50),
+        position: exp.position.substring(0, 50),
+        startDate: new BN(exp.startDate > 0 ? exp.startDate : currentTimestamp),
+        endDate: new BN(exp.endDate > 0 ? exp.endDate : 0),
+        responsibilities: exp.responsibilities.substring(0, 300)
+      })),
+      skills: resume.skills.map(skill => skill.substring(0, 50)),
+      certifications: resume.certifications.map(cert => ({
+        name: cert.name.substring(0, 50),
+        issuing_organization: cert.issuing_organization.substring(0, 50), // snake_case
+        issue_date: new BN(cert.issue_date > 0 ? cert.issue_date : currentTimestamp),
+        expiration_date: new BN(cert.expiration_date > 0 ? cert.expiration_date : 0),
+        credential_id: cert.credential_id.substring(0, 50), // snake_case
+        credential_url: cert.credential_url.substring(0, 100) // snake_case
+      })),
+      portfolio: resume.portfolio.map(item => ({
+        title: item.title.substring(0, 50),
+        description: item.description.substring(0, 200),
+        url: item.url.substring(0, 100),
+        imageUrl: item.imageUrl.substring(0, 100) // snake_case
+      })),
+      last_update: new BN(currentTimestamp)
+    };
+  
+    console.log("🔍 Blockchain resume data (snake_case):", blockchainResume);
+    return blockchainResume;
   };
 
-  const formatSol = (lamports: number): string => {
-    return (lamports / 1000000000).toFixed(2) + " SOL";
+  // FIXED: Blockchain upload with proper error handling
+  const handleSubmitToBlockchain = async () => {
+    try {
+      if (!wallet?.adapter?.publicKey) {
+        alert("Please connect your wallet first!");
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadProgress(0);
+      setCurrentStep("Preparing data...");
+
+      const program = getProgram(wallet.adapter);
+      const [userPDA] = findUserPDA(wallet.adapter.publicKey);
+      
+      // Check if user account exists first
+      try {
+        await program.account.user.fetch(userPDA);
+        console.log("✅ User account found");
+      } catch (e) {
+        alert("User account not found. Please register first!");
+        setIsUploading(false);
+        return;
+      }
+
+      setCurrentStep("Validating data...");
+      setUploadProgress(20);
+
+      // Validate data against Rust constraints
+      const validationErrors = [];
+      
+      if (editableResume.education.length > 3) {
+        validationErrors.push("Maximum 3 education entries allowed");
+      }
+      if (editableResume.experience.length > 3) {
+        validationErrors.push("Maximum 3 experience entries allowed");
+      }
+      if (editableResume.skills.length > 10) {
+        validationErrors.push("Maximum 10 skills allowed");
+      }
+      if (editableResume.certifications.length > 3) {
+        validationErrors.push("Maximum 3 certifications allowed");
+      }
+      if (editableResume.portfolio.length > 3) {
+        validationErrors.push("Maximum 3 portfolio items allowed");
+      }
+
+      if (validationErrors.length > 0) {
+        alert("Validation errors:\n\n" + validationErrors.join("\n"));
+        setIsUploading(false);
+        return;
+      }
+
+      setCurrentStep("Formatting for blockchain...");
+      setUploadProgress(40);
+
+      // Prepare data that EXACTLY matches Rust structure
+      const blockchainData = prepareForBlockchain(editableResume);
+
+      console.log("🚀 Sending to blockchain:", blockchainData);
+
+      setCurrentStep("Uploading to blockchain...");
+      setUploadProgress(60);
+
+      const txSig = await program.methods
+        .updateResume(blockchainData)
+        .accounts({
+          user: userPDA,
+          authority: wallet.adapter.publicKey,
+        })
+        .rpc();
+
+      setUploadProgress(100);
+      setCurrentStep("Upload complete!");
+
+      console.log("✅ Transaction successful:", txSig);
+
+      // Refresh data from blockchain with proper error handling
+      setTimeout(async () => {
+        try {
+          const updatedUser = await program.account.user.fetch(userPDA);
+          console.log("🔄 Updated user data from blockchain:", updatedUser);
+          
+          if (updatedUser.resume) {
+            // Safely convert blockchain data back to frontend format
+            const blockchainResume = updatedUser.resume;
+            
+            // Use optional chaining and null checks to prevent "cannot read undefined" errors
+            const safeResume: Resume = {
+              education: (blockchainResume.education || []).map((edu: any) => ({
+                institution: edu?.institution || "",
+                degree: edu?.degree || "",
+                fieldOfStudy: edu?.fieldOfStudy || "",
+                startDate: edu?.startDate?.toNumber?.() || 0,
+                endDate: edu?.endDate?.toNumber?.() || 0,
+                grade: edu?.grade || "",
+                description: edu?.description || ""
+              })),
+              experience: (blockchainResume.experience || []).map((exp: any) => ({
+                company: exp?.company || "",
+                position: exp?.position || "",
+                startDate: exp?.startDate?.toNumber?.() || 0,
+                endDate: exp?.endDate?.toNumber?.() || 0,
+                responsibilities: exp?.responsibilities || ""
+              })),
+              skills: blockchainResume.skills || [],
+              certifications: (blockchainResume.certifications || []).map((cert: any) => ({
+                name: cert?.name || "",
+                issuing_organization: cert?.issuing_organization || "",
+                issue_date: cert?.issue_date?.toNumber?.() || 0,
+                expiration_date: cert?.expiration_date?.toNumber?.() || 0,
+                credential_id: cert?.credential_id || "",
+                credential_url: cert?.credential_url || ""
+              })),
+              portfolio: (blockchainResume.portfolio || []).map((item: any) => ({
+                title: item?.title || "",
+                description: item?.description || "",
+                url: item?.url || "",
+                imageUrl: item?.imageUrl || ""
+              })),
+              last_update: blockchainResume?.last_update?.toNumber?.() || Math.floor(Date.now() / 1000)
+            };
+            
+            setEditableResume(safeResume);
+          }
+        } catch (error) {
+          console.error("Error refreshing data:", error);
+        }
+        setIsUploading(false);
+      }, 2000);
+
+      alert(`✅ Resume successfully updated on blockchain!\n\nTransaction: ${txSig}`);
+      
+      handleSaveChanges();
+
+    } catch (error: any) {
+      console.error("❌ Blockchain error:", error);
+      
+      let errorMsg = "Failed to submit resume to blockchain.\n\n";
+      
+      if (error.message?.includes("indeterminate span")) {
+        errorMsg += "Data structure issue. Please check field names match backend.";
+      } else if (error.message?.includes("Transaction too large")) {
+        errorMsg += "Data too large. Please reduce text lengths.";
+      } else if (error.message?.includes("Account does not exist")) {
+        errorMsg += "User account not found. Please register first!";
+      } else {
+        errorMsg += "Error: " + (error.message || "Unknown error");
+      }
+      
+      if (error.logs && error.logs.length > 0) {
+        console.log("📋 Transaction logs:", error.logs);
+        errorMsg += "\n\nCheck browser console for detailed logs.";
+      }
+      
+      alert(errorMsg);
+      setIsUploading(false);
+    }
+  };
+
+  const formatDate = (timestamp: number): string => {
+    if (!timestamp || timestamp === 0 || timestamp < 31536000) {
+      return "Present";
+    }
+    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   const handleSaveChanges = (): void => {
@@ -204,6 +420,11 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
   // Education handlers
   const handleAddEducation = (): void => {
+    if (editableResume.education.length >= 3) {
+      alert("Maximum 3 education entries allowed");
+      return;
+    }
+    const currentTimestamp = Math.floor(Date.now() / 1000);
     setEditableResume(prev => ({
       ...prev,
       education: [
@@ -211,9 +432,9 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
         {
           institution: "",
           degree: "",
-          field_of_study: "",
-          start_date: null,
-          end_date: null,
+          fieldOfStudy: "",
+          startDate: currentTimestamp,
+          endDate: 0,
           grade: "",
           description: ""
         }
@@ -244,6 +465,11 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
   // Experience handlers
   const handleAddExperience = (): void => {
+    if (editableResume.experience.length >= 3) {
+      alert("Maximum 3 experience entries allowed");
+      return;
+    }
+    const currentTimestamp = Math.floor(Date.now() / 1000);
     setEditableResume(prev => ({
       ...prev,
       experience: [
@@ -251,8 +477,8 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
         {
           company: "",
           position: "",
-          start_date: null,
-          end_date: null,
+          startDate: currentTimestamp,
+          endDate: 0,
           responsibilities: ""
         }
       ]
@@ -282,6 +508,10 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
   // Skills handlers
   const handleAddSkill = (): void => {
+    if (editableResume.skills.length >= 10) {
+      alert("Maximum 10 skills allowed");
+      return;
+    }
     setEditableResume(prev => ({
       ...prev,
       skills: [...prev.skills, ""]
@@ -308,6 +538,11 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
   // Certification handlers
   const handleAddCertification = (): void => {
+    if (editableResume.certifications.length >= 3) {
+      alert("Maximum 3 certifications allowed");
+      return;
+    }
+    const currentTimestamp = Math.floor(Date.now() / 1000);
     setEditableResume(prev => ({
       ...prev,
       certifications: [
@@ -315,8 +550,8 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
         {
           name: "",
           issuing_organization: "",
-          issue_date: null,
-          expiration_date: null,
+          issue_date: currentTimestamp,
+          expiration_date: 0,
           credential_id: "",
           credential_url: ""
         }
@@ -347,6 +582,10 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
   // Portfolio handlers
   const handleAddPortfolio = (): void => {
+    if (editableResume.portfolio.length >= 3) {
+      alert("Maximum 3 portfolio items allowed");
+      return;
+    }
     setEditableResume(prev => ({
       ...prev,
       portfolio: [
@@ -355,7 +594,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
           title: "",
           description: "",
           url: "",
-          image_url: ""
+          imageUrl: ""
         }
       ]
     }));
@@ -382,206 +621,84 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
     }));
   };
 
-  // Blockchain submission with proper error handling
-  const handleSubmitToBlockchain = async () => {
-    try {
-      if (!wallet?.adapter?.publicKey) {
-        alert("Please connect your wallet first!");
-        return;
-      }
+  return (
+    <div className="min-h-screen p-4 lg:p-6 bg-gradient-to-br from-background to-muted/20">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
+              Professional Resume
+            </h1>
+            <p className="text-foreground-muted mt-1">
+              Build your professional profile on the blockchain
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {isEditing ? (
+              <>
+                <Button onClick={handleSaveChanges} className="gap-2 bg-green-600 hover:bg-green-700">
+                  <Save className="h-4 w-4" />
+                  Save Changes
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleSubmitToBlockchain} 
+                  className="gap-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10"
+                  disabled={isUploading}
+                >
+                  <Shield className="h-4 w-4" />
+                  {isUploading ? "Uploading..." : "Save to Blockchain"}
+                </Button>
+                <Button variant="outline" onClick={handleCancelEdit} className="gap-2">
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setIsEditing(true)} className="gap-2 bg-primary hover:bg-primary/90">
+                <Edit3 className="h-4 w-4" />
+                Edit Resume
+              </Button>
+            )}
+          </div>
+        </div>
 
-      const program = getProgram(wallet.adapter);
-      const [userPDA] = findUserPDA(wallet.adapter.publicKey);
-      
-      // Check if user account exists first
-      try {
-        await program.account.user.fetch(userPDA);
-        console.log("✅ User account found");
-      } catch (e) {
-        alert("User account not found. Please register first!");
-        return;
-      }
+        {/* Upload Progress */}
+        {isUploading && (
+          <Card className="glass-card border-2 border-neon-cyan/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-neon-cyan" />
+                Uploading to Blockchain
+              </CardTitle>
+              <CardDescription>{currentStep}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Progress value={uploadProgress} className="w-full h-3" />
+              <div className="flex justify-between text-sm text-foreground-muted mt-2">
+                <span>Progress: {Math.round(uploadProgress)}%</span>
+                <span>{currentStep}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-      // Reasonable limits for blockchain storage
-      const MAX_LIMITS = {
-        education: 3,
-        experience: 3,
-        skills: 10,
-        certifications: 3,
-        portfolio: 3
-      };
-
-      // Safe truncate function
-      const truncate = (str: string, maxLen: number): string => {
-        if (!str) return "";
-        const trimmed = str.trim();
-        return trimmed.length > maxLen ? trimmed.substring(0, maxLen) : trimmed;
-      };
-
-      // Prepare resume data with proper formatting
-      const resumeData = {
-        education: editableResume.education
-          .filter(edu => edu.institution && edu.degree)
-          .slice(0, MAX_LIMITS.education)
-          .map(edu => ({
-            institution: truncate(edu.institution, 50),
-            degree: truncate(edu.degree, 50),
-            field_of_study: truncate(edu.field_of_study, 50),
-            start_date: new BN(edu.start_date || Math.floor(Date.now() / 1000)),
-            end_date: new BN(edu.end_date || Math.floor(Date.now() / 1000)),
-            grade: truncate(edu.grade, 20),
-            description: truncate(edu.description, 200)
-          })),
-        experience: editableResume.experience
-          .filter(exp => exp.company && exp.position)
-          .slice(0, MAX_LIMITS.experience)
-          .map(exp => ({
-            company: truncate(exp.company, 50),
-            position: truncate(exp.position, 50),
-            start_date: new BN(exp.start_date || Math.floor(Date.now() / 1000)),
-            end_date: new BN(exp.end_date || Math.floor(Date.now() / 1000)),
-            responsibilities: truncate(exp.responsibilities, 300)
-          })),
-        skills: editableResume.skills
-          .filter(skill => skill && skill.trim())
-          .slice(0, MAX_LIMITS.skills)
-          .map(skill => truncate(skill, 50)),
-        certifications: editableResume.certifications
-          .filter(cert => cert.name)
-          .slice(0, MAX_LIMITS.certifications)
-          .map(cert => ({
-            name: truncate(cert.name, 50),
-            issuing_organization: truncate(cert.issuing_organization, 50),
-            issue_date: new BN(cert.issue_date || Math.floor(Date.now() / 1000)),
-            expiration_date: new BN(cert.expiration_date || Math.floor(Date.now() / 1000)),
-            credential_id: truncate(cert.credential_id, 50),
-            credential_url: truncate(cert.credential_url, 100)
-          })),
-        portfolio: editableResume.portfolio
-          .filter(item => item.title)
-          .slice(0, MAX_LIMITS.portfolio)
-          .map(item => ({
-            title: truncate(item.title, 50),
-            description: truncate(item.description, 200),
-            url: truncate(item.url, 100),
-            image_url: truncate(item.image_url, 100)
-          })),
-        last_update: new BN(Math.floor(Date.now() / 1000))
-      };
-
-      console.log("📝 Prepared resume data:", resumeData);
-
-      // Validate we have at least some data
-      if (resumeData.education.length === 0 && resumeData.experience.length === 0 && resumeData.skills.length === 0) {
-        alert("Please add at least some education, experience, or skills before submitting to blockchain.");
-        return;
-      }
-
-      // Warn about truncation
-      const truncatedItems = [];
-      if (editableResume.education.length > MAX_LIMITS.education) {
-        truncatedItems.push(`${editableResume.education.length - MAX_LIMITS.education} education entries`);
-      }
-      if (editableResume.experience.length > MAX_LIMITS.experience) {
-        truncatedItems.push(`${editableResume.experience.length - MAX_LIMITS.experience} experience entries`);
-      }
-      if (editableResume.skills.length > MAX_LIMITS.skills) {
-        truncatedItems.push(`${editableResume.skills.length - MAX_LIMITS.skills} skills`);
-      }
-      
-      if (truncatedItems.length > 0) {
-        const confirmed = window.confirm(
-          `Note: Due to blockchain size limits, some items will be truncated:\n- ${truncatedItems.join('\n- ')}\n\nContinue?`
-        );
-        if (!confirmed) return;
-      }
-
-      console.log("🚀 Sending transaction...");
-      const txSig = await program.methods
-        .updateResume(resumeData)
-        .accounts({
-          user: userPDA,
-          authority: wallet.adapter.publicKey,
-        })
-        .rpc();
-
-      console.log("✅ Resume updated successfully:", txSig);
-      alert(`Resume successfully updated on blockchain!\n\nTransaction: ${txSig}`);
-      
-      // Update local state
-      handleSaveChanges();
-
-    } catch (error: any) {
-      console.error("❌ Error submitting to blockchain:", error);
-      
-      let errorMsg = "Failed to submit resume to blockchain.\n\n";
-      
-      if (error.message?.includes("indeterminate span")) {
-        errorMsg += "Data structure issue. Please try with fewer items or shorter text.";
-      } else if (error.message?.includes("Transaction too large")) {
-        errorMsg += "The data is too large. Please reduce the number of items.";
-      } else if (error.message?.includes("Account does not exist")) {
-        errorMsg += "User account not found. Please register first!";
-      } else if (error.message) {
-        errorMsg += "Error: " + error.message;
-      }
-      
-      // Show error logs if available
-      if (error.logs && error.logs.length > 0) {
-        console.log("📋 Transaction logs:", error.logs);
-        errorMsg += "\n\nCheck browser console for detailed logs.";
-      }
-      
-      alert(errorMsg);
-    }
-  };
-
-  const stats = [
-    {
-      title: "Reputation Score",
-      value: editableUserData.reputation,
-      max: 100,
-      icon: Star,
-      color: "text-neon-gold"
-    },
-    {
-      title: "Completed Jobs",
-      value: editableUserData.completed_jobs,
-      icon: CheckCircle,
-      color: "text-success"
-    },
-    {
-      title: "Total Earnings",
-      value: formatSol(editableUserData.total_earnings),
-      icon: DollarSign,
-      color: "text-neon-purple"
-    },
-    {
-      title: "Active Disputes",
-      value: editableUserData.disputes_raised - editableUserData.disputes_resolved,
-      icon: Shield,
-      color: "text-destructive"
-    }
-  ];
-
-  const renderResumeSection = () => {
-    return (
-      <div className="space-y-6">
         {/* Education Section */}
         <Card className="glass-card border-2 border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-neon-cyan" />
-              Education
+              Education {editableResume.education.length}/3
             </CardTitle>
             {isEditing && (
-              <Button variant="outline" size="sm" onClick={handleAddEducation} className="gap-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10">
+              <Button variant="outline" size="sm" onClick={handleAddEducation} className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Education
               </Button>
             )}
           </CardHeader>
-          <CardContent className="space-y-4 pt-6">
+          <CardContent className="space-y-4">
             {editableResume.education.map((edu, index) => (
               <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
@@ -594,6 +711,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handleEducationChange(index, 'institution', e.target.value)}
                           placeholder="University Name"
                           className="bg-background/50"
+                          maxLength={50}
                         />
                       </div>
                       <div className="space-y-2">
@@ -603,16 +721,18 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handleEducationChange(index, 'degree', e.target.value)}
                           placeholder="Bachelor's Degree"
                           className="bg-background/50"
+                          maxLength={50}
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Field of Study</label>
                       <Input 
-                        value={edu.field_of_study} 
-                        onChange={(e) => handleEducationChange(index, 'field_of_study', e.target.value)}
+                        value={edu.fieldOfStudy} 
+                        onChange={(e) => handleEducationChange(index, 'fieldOfStudy', e.target.value)}
                         placeholder="Computer Science"
                         className="bg-background/50"
+                        maxLength={50}
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -625,15 +745,17 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                               className="w-full justify-start text-left font-normal bg-background/50"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {edu.start_date ? format(new Date(edu.start_date * 1000), "PPP") : "Pick a date"}
+                              {edu.startDate ? format(new Date(edu.startDate * 1000), "PPP") : "Pick a date"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
                             <Calendar
                               mode="single"
-                              selected={edu.start_date ? new Date(edu.start_date * 1000) : undefined}
-                              onSelect={(date) => handleEducationChange(index, 'start_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              selected={edu.startDate ? new Date(edu.startDate * 1000) : undefined}
+                              onSelect={(date) => handleEducationChange(index, 'startDate', date ? Math.floor(date.getTime() / 1000) : Math.floor(Date.now() / 1000))}
                               initialFocus
+                              fromYear={1960}
+                              toYear={new Date().getFullYear()}
                             />
                           </PopoverContent>
                         </Popover>
@@ -647,15 +769,17 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                               className="w-full justify-start text-left font-normal bg-background/50"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {edu.end_date ? format(new Date(edu.end_date * 1000), "PPP") : "Present"}
+                              {edu.endDate ? format(new Date(edu.endDate * 1000), "PPP") : "Present"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
                             <Calendar
                               mode="single"
-                              selected={edu.end_date ? new Date(edu.end_date * 1000) : undefined}
-                              onSelect={(date) => handleEducationChange(index, 'end_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              selected={edu.endDate ? new Date(edu.endDate * 1000) : undefined}
+                              onSelect={(date) => handleEducationChange(index, 'endDate', date ? Math.floor(date.getTime() / 1000) : 0)}
                               initialFocus
+                              fromYear={1960}
+                              toYear={new Date().getFullYear() + 10}
                             />
                           </PopoverContent>
                         </Popover>
@@ -668,6 +792,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                         onChange={(e) => handleEducationChange(index, 'grade', e.target.value)}
                         placeholder="GPA or Grade"
                         className="bg-background/50"
+                        maxLength={20}
                       />
                     </div>
                     <div className="space-y-2">
@@ -677,6 +802,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                         onChange={(e) => handleEducationChange(index, 'description', e.target.value)}
                         placeholder="Description of your education..."
                         className="bg-background/50 min-h-[80px]"
+                        maxLength={200}
                       />
                     </div>
                     <Button variant="destructive" size="sm" onClick={() => handleRemoveEducation(index)} className="gap-2">
@@ -689,11 +815,11 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-semibold text-lg text-foreground">{edu.institution}</h3>
-                        <p className="text-foreground-muted">{edu.degree} in {edu.field_of_study}</p>
+                        <p className="text-foreground-muted">{edu.degree} in {edu.fieldOfStudy}</p>
                         {edu.grade && <p className="text-sm text-foreground-muted mt-1">Grade: {edu.grade}</p>}
                       </div>
                       <div className="text-right text-sm text-foreground-muted">
-                        <p>{formatDate(edu.start_date)} - {formatDate(edu.end_date)}</p>
+                        <p>{formatDate(edu.startDate)} - {formatDate(edu.endDate)}</p>
                       </div>
                     </div>
                     {edu.description && (
@@ -718,19 +844,19 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
         {/* Experience Section */}
         <Card className="glass-card border-2 border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
               <Building className="h-5 w-5 text-neon-purple" />
-              Experience
+              Experience {editableResume.experience.length}/3
             </CardTitle>
             {isEditing && (
-              <Button variant="outline" size="sm" onClick={handleAddExperience} className="gap-2 border-neon-purple text-neon-purple hover:bg-neon-purple/10">
+              <Button variant="outline" size="sm" onClick={handleAddExperience} className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Experience
               </Button>
             )}
           </CardHeader>
-          <CardContent className="space-y-4 pt-6">
+          <CardContent className="space-y-4">
             {editableResume.experience.map((exp, index) => (
               <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
@@ -743,6 +869,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handleExperienceChange(index, 'company', e.target.value)}
                           placeholder="Company Name"
                           className="bg-background/50"
+                          maxLength={50}
                         />
                       </div>
                       <div className="space-y-2">
@@ -752,6 +879,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handleExperienceChange(index, 'position', e.target.value)}
                           placeholder="Job Title"
                           className="bg-background/50"
+                          maxLength={50}
                         />
                       </div>
                     </div>
@@ -765,15 +893,17 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                               className="w-full justify-start text-left font-normal bg-background/50"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {exp.start_date ? format(new Date(exp.start_date * 1000), "PPP") : "Pick a date"}
+                              {exp.startDate ? format(new Date(exp.startDate * 1000), "PPP") : "Pick a date"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
                             <Calendar
                               mode="single"
-                              selected={exp.start_date ? new Date(exp.start_date * 1000) : undefined}
-                              onSelect={(date) => handleExperienceChange(index, 'start_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              selected={exp.startDate ? new Date(exp.startDate * 1000) : undefined}
+                              onSelect={(date) => handleExperienceChange(index, 'startDate', date ? Math.floor(date.getTime() / 1000) : Math.floor(Date.now() / 1000))}
                               initialFocus
+                              fromYear={1960}
+                              toYear={new Date().getFullYear()}
                             />
                           </PopoverContent>
                         </Popover>
@@ -787,15 +917,17 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                               className="w-full justify-start text-left font-normal bg-background/50"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {exp.end_date ? format(new Date(exp.end_date * 1000), "PPP") : "Present"}
+                              {exp.endDate ? format(new Date(exp.endDate * 1000), "PPP") : "Present"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
                             <Calendar
                               mode="single"
-                              selected={exp.end_date ? new Date(exp.end_date * 1000) : undefined}
-                              onSelect={(date) => handleExperienceChange(index, 'end_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              selected={exp.endDate ? new Date(exp.endDate * 1000) : undefined}
+                              onSelect={(date) => handleExperienceChange(index, 'endDate', date ? Math.floor(date.getTime() / 1000) : 0)}
                               initialFocus
+                              fromYear={1960}
+                              toYear={new Date().getFullYear() + 10}
                             />
                           </PopoverContent>
                         </Popover>
@@ -808,6 +940,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                         onChange={(e) => handleExperienceChange(index, 'responsibilities', e.target.value)}
                         placeholder="Describe your key responsibilities and achievements..."
                         className="bg-background/50 min-h-[100px]"
+                        maxLength={300}
                       />
                     </div>
                     <Button variant="destructive" size="sm" onClick={() => handleRemoveExperience(index)} className="gap-2">
@@ -823,7 +956,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                         <p className="text-foreground-muted">{exp.position}</p>
                       </div>
                       <div className="text-right text-sm text-foreground-muted">
-                        <p>{formatDate(exp.start_date)} - {formatDate(exp.end_date)}</p>
+                        <p>{formatDate(exp.startDate)} - {formatDate(exp.endDate)}</p>
                       </div>
                     </div>
                     {exp.responsibilities && (
@@ -848,19 +981,19 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
         {/* Skills Section */}
         <Card className="glass-card border-2 border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-neon-gold" />
-              Skills
+              Skills {editableResume.skills.length}/10
             </CardTitle>
             {isEditing && (
-              <Button variant="outline" size="sm" onClick={handleAddSkill} className="gap-2 border-neon-gold text-neon-gold hover:bg-neon-gold/10">
+              <Button variant="outline" size="sm" onClick={handleAddSkill} className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Skill
               </Button>
             )}
           </CardHeader>
-          <CardContent className="pt-6">
+          <CardContent>
             {isEditing ? (
               <div className="space-y-4">
                 {editableResume.skills.map((skill, index) => (
@@ -870,6 +1003,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                       onChange={(e) => handleSkillChange(index, e.target.value)}
                       placeholder="Enter a skill (e.g., React, Solana, Rust)"
                       className="bg-background/50"
+                      maxLength={50}
                     />
                     <Button variant="destructive" size="icon" onClick={() => handleRemoveSkill(index)}>
                       <Trash2 className="h-4 w-4" />
@@ -907,19 +1041,19 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
         {/* Certifications Section */}
         <Card className="glass-card border-2 border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
               <Award className="h-5 w-5 text-neon-cyan" />
-              Certifications
+              Certifications {editableResume.certifications.length}/3
             </CardTitle>
             {isEditing && (
-              <Button variant="outline" size="sm" onClick={handleAddCertification} className="gap-2 border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10">
+              <Button variant="outline" size="sm" onClick={handleAddCertification} className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Certification
               </Button>
             )}
           </CardHeader>
-          <CardContent className="space-y-4 pt-6">
+          <CardContent className="space-y-4">
             {editableResume.certifications.map((cert, index) => (
               <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
@@ -932,6 +1066,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handleCertificationChange(index, 'name', e.target.value)}
                           placeholder="e.g., AWS Solutions Architect"
                           className="bg-background/50"
+                          maxLength={50}
                         />
                       </div>
                       <div className="space-y-2">
@@ -941,6 +1076,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handleCertificationChange(index, 'issuing_organization', e.target.value)}
                           placeholder="e.g., Amazon Web Services"
                           className="bg-background/50"
+                          maxLength={50}
                         />
                       </div>
                     </div>
@@ -961,8 +1097,10 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                             <Calendar
                               mode="single"
                               selected={cert.issue_date ? new Date(cert.issue_date * 1000) : undefined}
-                              onSelect={(date) => handleCertificationChange(index, 'issue_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              onSelect={(date) => handleCertificationChange(index, 'issue_date', date ? Math.floor(date.getTime() / 1000) : Math.floor(Date.now() / 1000))}
                               initialFocus
+                              fromYear={1960}
+                              toYear={new Date().getFullYear()}
                             />
                           </PopoverContent>
                         </Popover>
@@ -983,8 +1121,10 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                             <Calendar
                               mode="single"
                               selected={cert.expiration_date ? new Date(cert.expiration_date * 1000) : undefined}
-                              onSelect={(date) => handleCertificationChange(index, 'expiration_date', date ? Math.floor(date.getTime() / 1000) : null)}
+                              onSelect={(date) => handleCertificationChange(index, 'expiration_date', date ? Math.floor(date.getTime() / 1000) : 0)}
                               initialFocus
+                              fromYear={new Date().getFullYear()}
+                              toYear={new Date().getFullYear() + 10}
                             />
                           </PopoverContent>
                         </Popover>
@@ -998,6 +1138,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handleCertificationChange(index, 'credential_id', e.target.value)}
                           placeholder="e.g., ABC-123-XYZ"
                           className="bg-background/50"
+                          maxLength={50}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1007,6 +1148,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handleCertificationChange(index, 'credential_url', e.target.value)}
                           placeholder="https://..."
                           className="bg-background/50"
+                          maxLength={100}
                         />
                       </div>
                     </div>
@@ -1061,19 +1203,19 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
 
         {/* Portfolio Section */}
         <Card className="glass-card border-2 border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between bg-muted/30 rounded-t-lg">
-            <CardTitle className="flex items-center gap-2 text-xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-neon-purple" />
-              Portfolio
+              Portfolio {editableResume.portfolio.length}/3
             </CardTitle>
             {isEditing && (
-              <Button variant="outline" size="sm" onClick={handleAddPortfolio} className="gap-2 border-neon-purple text-neon-purple hover:bg-neon-purple/10">
+              <Button variant="outline" size="sm" onClick={handleAddPortfolio} className="gap-2">
                 <Plus className="h-4 w-4" />
                 Add Project
               </Button>
             )}
           </CardHeader>
-          <CardContent className="space-y-4 pt-6">
+          <CardContent className="space-y-4">
             {editableResume.portfolio.map((item, index) => (
               <div key={index} className="p-4 glass-panel rounded-lg border border-border/30">
                 {isEditing ? (
@@ -1085,6 +1227,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                         onChange={(e) => handlePortfolioChange(index, 'title', e.target.value)}
                         placeholder="e.g., DeFi Lending Protocol"
                         className="bg-background/50"
+                        maxLength={50}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1094,6 +1237,7 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                         onChange={(e) => handlePortfolioChange(index, 'description', e.target.value)}
                         placeholder="Describe your project, technologies used, and your role..."
                         className="bg-background/50 min-h-[100px]"
+                        maxLength={200}
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1104,15 +1248,17 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                           onChange={(e) => handlePortfolioChange(index, 'url', e.target.value)}
                           placeholder="https://github.com/..."
                           className="bg-background/50"
+                          maxLength={100}
                         />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Image URL (Optional)</label>
                         <Input 
-                          value={item.image_url} 
-                          onChange={(e) => handlePortfolioChange(index, 'image_url', e.target.value)}
+                          value={item.imageUrl} 
+                          onChange={(e) => handlePortfolioChange(index, 'imageUrl', e.target.value)}
                           placeholder="https://..."
                           className="bg-background/50"
+                          maxLength={100}
                         />
                       </div>
                     </div>
@@ -1129,9 +1275,9 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
                         <p className="text-foreground-muted text-sm mt-2 leading-relaxed">{item.description}</p>
                       </div>
                     </div>
-                    {item.image_url && (
+                    {item.imageUrl && (
                       <img 
-                        src={item.image_url} 
+                        src={item.imageUrl} 
                         alt={item.title}
                         className="w-full h-48 object-cover rounded-lg mt-3 border border-border/30"
                       />
@@ -1162,85 +1308,8 @@ const UserProfilePage = ({ role, onComplete, userData: initialUserData, onSave }
             )}
           </CardContent>
         </Card>
-      </div>
-    );
-  };
 
-  return (
-    <div className="min-h-screen p-4 lg:p-6 bg-gradient-to-br from-background to-muted/20">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
-              {!initialUserData?.resume ? "Create Your Resume" : "Professional Resume"}
-            </h1>
-            <p className="text-foreground-muted mt-1">
-              {!initialUserData?.resume 
-                ? "Build your professional profile to showcase your skills and experience" 
-                : "Manage and update your professional information"
-              }
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {isEditing ? (
-              <>
-                <Button onClick={handleSaveChanges} className="gap-2 bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4" />
-                  Save Changes
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={handleSubmitToBlockchain} 
-                  className="gap-2 bg-gradient-to-r from-neon-cyan to-neon-purple text-white hover:from-neon-cyan/90 hover:to-neon-purple/90 border-0"
-                >
-                  <Shield className="h-4 w-4" />
-                  Submit to Blockchain
-                </Button>
-                <Button variant="outline" onClick={handleCancelEdit} className="gap-2">
-                  <X className="h-4 w-4" />
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button onClick={() => setIsEditing(true)} className="gap-2 bg-primary hover:bg-primary/90">
-                  <Edit3 className="h-4 w-4" />
-                  Edit Resume
-                </Button>
-                <Button variant="outline" onClick={onComplete} className="gap-2">
-                  Back to Dashboard
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Stats Overview */}
-        {!isEditing && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stats.map((stat, index) => (
-              <Card key={index} className="glass-card border border-border/30">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-foreground-muted">{stat.title}</p>
-                      <p className={`text-2xl font-bold ${stat.color} mt-1`}>{stat.value}</p>
-                    </div>
-                    <div className={`p-3 rounded-full ${stat.color.replace('text-', 'bg-')}/10`}>
-                      <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Resume Content */}
-        {renderResumeSection()}
-
-        {/* Action Buttons for Mobile */}
+        {/* Mobile Action Buttons */}
         <div className="fixed bottom-6 left-6 right-6 sm:hidden">
           <div className="glass-card p-4 rounded-lg border border-border/30">
             <div className="flex gap-2">
