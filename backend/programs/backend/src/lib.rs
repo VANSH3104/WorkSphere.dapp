@@ -7,6 +7,8 @@ use state::*;
 use contexts::*;
 use error::ErrorCode;
 
+use anchor_lang::solana_program::system_instruction;
+use anchor_spl::token::{self, Token, TokenAccount};
 declare_id!("9Vx28qdjzSWZfNJRDUmFtnAh9SWxCPnepAVKTEY1Lii4");
 
 
@@ -118,7 +120,10 @@ pub mod backend {
     ) -> Result<()> {
         
         let job = &mut ctx.accounts.job;
-        let now = &Clock::get()?.unix_timestamp;
+        let clock = &Clock::get()?;
+        let now = clock.unix_timestamp;
+        require!(deadline > now, ErrorCode::InvalidDeadline);
+        
         job.authority = ctx.accounts.authority.key();
         job.freelancer = None;
         job.bidders = Vec::new();
@@ -128,12 +133,63 @@ pub mod backend {
         job.budget = budget;
         job.deadline = deadline;
         job.status = JobStatus::Open;
-        job.created_at = *now;
-        job.updated_at = *now;
+        job.created_at = now;
+        job.updated_at = now;
         job.milestones = milestones;
+        job.reviews = Vec::new();
         job.dispute = None;
         require!(job.authority == ctx.accounts.authority.key(), ErrorCode::AuthorityMismatch);
 
+        Ok(())
+    }
+    pub fn assign_job(
+        ctx: Context<AssignJob>,
+        freelancer: Pubkey,
+        bid_amount: u64,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let clock = Clock::get()?;
+        let now = clock.unix_timestamp;
+    
+        // Verify the freelancer has bid on this job
+        let bid_exists = job.bidders.iter().any(|bid| {
+            bid.freelancer == freelancer && bid.proposed_amount == bid_amount
+        });
+        require!(bid_exists, ErrorCode::BidNotFound);
+    
+        // Verify client has enough SOL for escrow
+        let client_lamports = ctx.accounts.client.lamports();
+        require!(client_lamports >= bid_amount, ErrorCode::InsufficientBalance);
+    
+        // Transfer funds to escrow
+        let transfer_ix = system_instruction::transfer(
+            &ctx.accounts.client.key(),
+            &ctx.accounts.escrow.key(),
+            bid_amount,
+        );
+        
+        anchor_lang::solana_program::program::invoke(
+            &transfer_ix,
+            &[
+                ctx.accounts.client.to_account_info(),
+                ctx.accounts.escrow.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+    
+        // Update job status and assign freelancer
+        job.freelancer = Some(freelancer);
+        job.status = JobStatus::InProgress;
+        job.updated_at = now;
+        job.budget = bid_amount; // Update budget to the accepted bid amount
+    
+        msg!(
+            "Job '{}' assigned to freelancer: {}. Amount {} SOL transferred to escrow",
+            job.title,
+            freelancer,
+            bid_amount
+        );
+    
         Ok(())
     }
 }

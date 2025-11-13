@@ -129,6 +129,23 @@ pub struct Job {
     pub reviews: Vec<Review>,
     pub dispute: Option<Dispute>,
 }
+impl Job {
+    pub const LEN: usize = 
+        32 + // authority
+        32 + // client
+        1 + 32 + // freelancer (Option<Pubkey>) - 1 byte for discriminant + 32 for Pubkey
+        4 + (50 * Bid::LEN) + // bidders vec (max 50 bidders) - 4 bytes for length
+        4 + 100 + // title (4 bytes for length + 100 bytes)
+        4 + 1000 + // description (4 bytes for length + 1000 bytes)
+        8 + // budget
+        8 + // deadline
+        1 + // status (enum - 1 byte for discriminant)
+        8 + // created_at
+        8 + // updated_at
+        4 + (10 * Milestone::LEN) + // milestones vec (max 10 milestones)
+        4 + (10 * Review::LEN) + // reviews vec (max 10 reviews)
+        1 + (1 + Dispute::LEN); // dispute (Option<Dispute>) - 1 byte for Option + Dispute size
+}
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Review {
     pub reviewer: Pubkey,
@@ -152,6 +169,20 @@ pub struct Dispute {
     pub votes_against: u64,
     pub voters: Vec<Pubkey>,
 }
+impl Dispute {
+    pub const LEN: usize = 32 + // raiser
+        4 + 500 + // reason
+        1 + // status
+        8 + // created_at
+        1 + 8 + // resolved_at (Option)
+        1 + (4 + 500) + // resolution (Option)
+        8 + // voting_start
+        8 + // voting_end
+        8 + // votes_for
+        8 + // votes_against
+        4 + (100 * 32); // voters vec (max 100 voters)
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum DisputeStatus {
     Open,
@@ -166,9 +197,7 @@ pub enum JobStatus {
     Cancelled,
     Disputed,
 }
-impl Job {
-    pub const LEN: usize = 32 + 32 + 32 + 4 + 100 + 4 + 1000 + 8 + 8 + 1 + 8 + 8 + (4 + 1000 * Milestone::LEN) + (4 + 100 * Review::LEN) + (1 + 32 + 4 + 500 + 1 + 8 + 1 + 8 + 4 + 1000);
-}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Milestone {
     pub title: String,
@@ -179,10 +208,10 @@ pub struct Milestone {
 }
 
 impl Milestone {
-    pub const LEN: usize = 4 + 100 + 4 + 1000 + 8 + 8 + 1;
+    pub const LEN: usize = 4 + 100 + (4 + 1000) + 8 + 8 + 1;
 }
 impl Review {
-    pub const LEN: usize = 32 + 1 + 4 + 500 + 8;
+    pub const LEN: usize = 32 + 1 + (4 + 500) + 8;
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -191,4 +220,6 @@ pub struct Bid {
     pub proposed_amount: u64,
     pub timestamp: i64,
 }
-
+impl Bid {
+    pub const LEN: usize = 32 + 8 + 8;
+}

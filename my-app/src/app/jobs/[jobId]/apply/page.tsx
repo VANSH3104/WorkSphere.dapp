@@ -21,7 +21,7 @@ import { useParams, useRouter } from "next/navigation";
 const JobProposalPage = () => {
   const { jobId } = useParams();
   const navigate = useRouter();
-  const userRole = "freelancer";
+  const userRole = "client";
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 

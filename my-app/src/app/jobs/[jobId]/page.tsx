@@ -22,7 +22,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 const JobDetailPage = () => {
   const { jobId } = useParams();
   const navigate = useRouter();
-  const userRole = "freelancer";
+  const searchParams = useSearchParams();
+  const userRole = searchParams.get("role") || "client";
 
   // Mock job data
   const job = {

@@ -14,4 +14,14 @@ pub enum ErrorCode {
     TooManyCertifications,
     #[msg("Too many portfolio items (max 3)")]
     TooManyPortfolioItems,
+    #[msg("invalid deadline")]
+    InvalidDeadline,
+    #[msg("Job not open")]
+    JobNotOpen,
+    #[msg("Its not your job")]
+    NotJobClient,
+    #[msg("Bid not found")]
+    BidNotFound,
+    #[msg("Insufficient balance")]
+    InsufficientBalance
 }

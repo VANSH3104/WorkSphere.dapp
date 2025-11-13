@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::state::*;
+use crate::error::ErrorCode;
+use anchor_spl::token::{self, Token, TokenAccount};
 
 #[derive(Accounts)]
 #[instruction(name: String)]
@@ -62,4 +64,21 @@ pub struct CreateJob<'info> {
     pub authority: Signer<'info>,
     
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AssignJob<'info> {
+   #[account(
+       mut,
+       seeds = [b"job", job.client.as_ref(), job.title.as_bytes()],
+       bump,
+       constraint = job.status == JobStatus::Open @ ErrorCode::JobNotOpen,
+       constraint = job.client == client.key() @ ErrorCode::NotJobClient
+   )]
+   pub job: Account<'info, Job>,
+   #[account(mut)]
+   pub client: Signer<'info>,
+   pub freelancer: AccountInfo<'info>,
+   pub escrow: AccountInfo<'info>,
+   pub system_program: Program<'info, System>,
 }
