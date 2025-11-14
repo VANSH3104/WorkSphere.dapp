@@ -23,5 +23,19 @@ pub enum ErrorCode {
     #[msg("Bid not found")]
     BidNotFound,
     #[msg("Insufficient balance")]
-    InsufficientBalance
+    InsufficientBalance,
+    #[msg("Title too long")]
+    TitleTooLong,
+    #[msg("Description too long")]
+    DescriptionTooLong,
+    #[msg("Too many milestones")]
+    TooManyMilestones,
+    #[msg("Milestone amounts don't match total budget")]
+    MilestoneAmountMismatch,
+    #[msg("Invalid milestone date")]
+    InvalidMilestoneDate,
+    #[msg("Milestone due date is after job deadline")]
+    MilestoneAfterDeadline,
+    #[msg("Category too long")]
+    CategoryTooLong,
 }

@@ -115,6 +115,7 @@ impl PortfolioItem {
 #[account]
 pub struct Job {
     pub authority: Pubkey,
+    pub job_id: u64,
     pub client: Pubkey,
     pub freelancer: Option<Pubkey>,
     pub bidders: Vec<Bid>,
@@ -128,11 +129,14 @@ pub struct Job {
     pub milestones: Vec<Milestone>,
     pub reviews: Vec<Review>,
     pub dispute: Option<Dispute>,
+    pub skills: Vec<String>,
+    pub category: String,
 }
 impl Job {
     pub const LEN: usize = 
         32 + // authority
         32 + // client
+        8  +
         1 + 32 + // freelancer (Option<Pubkey>) - 1 byte for discriminant + 32 for Pubkey
         4 + (50 * Bid::LEN) + // bidders vec (max 50 bidders) - 4 bytes for length
         4 + 100 + // title (4 bytes for length + 100 bytes)
@@ -144,7 +148,9 @@ impl Job {
         8 + // updated_at
         4 + (10 * Milestone::LEN) + // milestones vec (max 10 milestones)
         4 + (10 * Review::LEN) + // reviews vec (max 10 reviews)
-        1 + (1 + Dispute::LEN); // dispute (Option<Dispute>) - 1 byte for Option + Dispute size
+        1 + (1 + Dispute::LEN) + // dispute (Option<Dispute>) - 1 byte for Option + Dispute size
+        4 + (10 * (4 + 50)) + // skills vec (max 10 skills, each max 50 chars)
+        4 + 50; 
 }
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Review {

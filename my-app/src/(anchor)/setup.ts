@@ -1,7 +1,7 @@
 import { Program, AnchorProvider, IdlAccounts } from "@coral-xyz/anchor";
 import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
 import { Idl } from "@coral-xyz/anchor";
-
+import BN from 'bn.js';
 import BackendIdl from "./idl.json";
 
 type BackendProgram = typeof BackendIdl;
@@ -45,12 +45,21 @@ export const findUserPDA = (authority: PublicKey) =>
     programId
   );
 
-export const findJobPDA = (authority: PublicKey, title: string) =>
-  PublicKey.findProgramAddressSync(
-    [Buffer.from("job"), authority.toBuffer(), Buffer.from(title)],
+
+export const findJobPDA = (authority: PublicKey, jobId: number | BN | bigint) => {
+  // Always convert to BN first, then to 8-byte LE
+  const jobIdBN = new BN(jobId.toString());
+  const jobIdBytes = jobIdBN.toArrayLike(Buffer, 'le', 8);
+  
+  console.log("🔍 PDA Seeds Debug:");
+  console.log("Job ID:", jobIdBN.toString());
+  console.log("Job ID bytes (hex):", Buffer.from(jobIdBytes).toString('hex'));
+  
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("job"), authority.toBuffer(), jobIdBytes],
     programId
   );
-
+};
 // ✅ Types
 export type BackendAccounts = IdlAccounts<BackendProgram>;
 export type UserAccount = BackendAccounts["user"]; // Note: lowercase "user"

@@ -6,8 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-backend = "9Vx28qdjzSWZfNJRDUmFtnAh9SWxCPnepAVKTEY1Lii4"
-
+backend = "TCmSPaJcRMbtzJbkGcGrJtcsjzNRpAwFRNxhqTC9BZZ"
 [registry]
 url = "https://api.apr.dev"
 

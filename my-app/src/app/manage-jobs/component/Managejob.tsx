@@ -219,7 +219,7 @@ const ManageJobsPage = () => {
             <Button
               variant="neon"
               className="w-full"
-              onClick={() => navigate.push(`/jobs/post?role=${userRole}`)}
+              onClick={() => navigate.push(`/manage-jobs/new`)}
             >
               Post New Job
             </Button>
