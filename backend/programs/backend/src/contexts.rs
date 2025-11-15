@@ -47,16 +47,38 @@ pub struct UpdateResumeCtx<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(job_id: u64)]
 pub struct CreateJob<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + 30000,
-        seeds = [b"job", authority.key().as_ref(), &job_id.to_le_bytes()],
+        space = 8 + 2950,
+        seeds = [b"job", job_counter.count.to_le_bytes().as_ref()],
         bump
     )]
     pub job: Account<'info, Job>,
+    
+    #[account(
+        mut,
+        seeds = [b"job_counter"],
+        bump
+    )]
+    pub job_counter: Account<'info, JobCounter>,
+    
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+}
+#[derive(Accounts)]
+pub struct InitializeJobCounter<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + JobCounter::LEN,
+        seeds = [b"job_counter"],
+        bump
+    )]
+    pub job_counter: Account<'info, JobCounter>,
     
     #[account(mut)]
     pub authority: Signer<'info>,

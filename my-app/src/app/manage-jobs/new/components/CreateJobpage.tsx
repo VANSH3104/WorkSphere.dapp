@@ -13,7 +13,7 @@
   import ConfirmationModal from "./ConfirmationModal";
   import { useToast } from "@/app/(module)/ui/use-toast";
   import { useRouter } from "next/navigation";
-  import { findJobPDA, getProgram, getUserJobCount, programId } from "@/(anchor)/setup";
+  import { findJobCounterPDA, findJobPDA, getProgram, getUserJobCount, programId } from "@/(anchor)/setup";
   import { useWallet } from "@solana/wallet-adapter-react";
   import { BN } from "@coral-xyz/anchor";
   import * as anchor from "@coral-xyz/anchor";
@@ -200,67 +200,76 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
         const program = getProgram(wallet.adapter);
         const authority = wallet.adapter.publicKey;
     
-        // 1️⃣ Generate jobId ONCE and use it consistently
-        const jobId = Date.now();
-        const jobIdBN = new BN(jobId);
+        // 1️⃣ Get job counter PDA to get the next universal job ID
+        const [jobCounterPDA] = findJobCounterPDA();
         
-        console.log("🆔 jobId:", jobId);
+        // Fetch current job counter
+        let jobCounter;
+        try {
+          jobCounter = await program.account.jobCounter.fetch(jobCounterPDA);
+          console.log("📊 Current job counter:", jobCounter.count.toString());
+        } catch (error) {
+          console.error("❌ Job counter not initialized. Please initialize it first.");
+          toast({
+            title: "Job Counter Not Initialized",
+            description: "Please initialize the job counter first",
+            variant: "destructive",
+          });
+          return;
+        }
     
-        // 2️⃣ Derive PDA using the SAME jobId
-        const [jobPda] = findJobPDA(authority, jobIdBN);
-        console.log("🔑 Job PDA:", jobPda.toString());
+        const nextJobId = jobCounter.count;
+        const jobIdBN = new BN(nextJobId);
+        
+        console.log("🆔 Using universal job ID:", nextJobId);
     
-        // 🔍 CRITICAL VERIFICATION - Manually verify the seeds
+        // 2️⃣ Derive job PDA using universal job ID only (matches Rust seeds)
+        const [jobPDA] = findJobPDA(jobIdBN);
+        console.log("🔑 Job PDA:", jobPDA.toString());
+    
+        // 🔍 CRITICAL VERIFICATION - Manually verify the seeds match Rust
         const jobIdBytes = jobIdBN.toArrayLike(Buffer, 'le', 8);
         const seeds = [
           Buffer.from("job"), 
-          authority.toBuffer(), 
-          jobIdBytes
+          jobIdBytes  // Only job ID, no authority (matches your Rust seeds)
         ];
         
         console.log("🔍 MANUAL VERIFICATION:");
         console.log("Seed 0 (string 'job'):", Buffer.from("job").toString('hex'));
-        console.log("Seed 1 (authority):", authority.toString());
-        console.log("Seed 2 (jobId bytes):", Buffer.from(jobIdBytes).toString('hex'));
+        console.log("Seed 1 (jobId bytes):", Buffer.from(jobIdBytes).toString('hex'));
         console.log("Expected PDA from seeds:", PublicKey.findProgramAddressSync(seeds, programId)[0].toString());
-        console.log("Our PDA:", jobPda.toString());
-        console.log("Match?", PublicKey.findProgramAddressSync(seeds, programId)[0].equals(jobPda));
+        console.log("Our PDA:", jobPDA.toString());
+        console.log("Match?", PublicKey.findProgramAddressSync(seeds, programId)[0].equals(jobPDA));
     
-        // Rest of your code remains the same...
+        // Convert form data
         const deadlineUnix = new BN(Math.floor(new Date(formData.deadline).getTime() / 1000));
         const budgetLamports = new BN(Math.floor(parseFloat(formData.budget) * 1_000_000_000));
     
-        const milestonesWithBN = formData.milestones.map(m => ({
-          title: m.title,
-          description: m.description,
-          amount: new BN(Math.floor(m.amount * 1_000_000_000)),
-          due_date: new BN(Math.floor(new Date(m.due_date).getTime() / 1000)),
-          completed: false,
-        }));
-    
+        // Remove milestones since your Rust program doesn't use them in create_job
         console.log("📦 Transaction data:", {
           title: formData.title,
-          jobId: jobIdBN.toString(),
+          description: formData.description,
           budget: budgetLamports.toString(),
           deadline: deadlineUnix.toString(),
-          milestones: milestonesWithBN.length,
+          skills: formData.skills,
+          category: formData.category,
+          universalJobId: nextJobId
         });
     
-        // 4️⃣ Send transaction
+        // 4️⃣ Send transaction - CORRECTED to match your Rust function signature
         const tx = await program.methods
           .createJob(
             formData.title,
-            jobIdBN,
             formData.description,
             budgetLamports,
             deadlineUnix,
-            milestonesWithBN,
             formData.skills,
             formData.category || ""
           )
           .accounts({
-            job: jobPda,
-            authority,
+            job: jobPDA,
+            jobCounter: jobCounterPDA, // Add job counter account
+            authority: authority,
             systemProgram: SystemProgram.programId,
           })
           .rpc();
@@ -271,7 +280,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
     
         toast({
           title: "Job Created!",
-          description: `Transaction: ${tx}`,
+          description: `Job #${nextJobId} published successfully! Transaction: ${tx.slice(0, 8)}...`,
         });
     
         setTimeout(() => {
@@ -287,7 +296,9 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
         if (error.message?.includes("0x1")) {
           errorMessage = "Invalid deadline - must be in the future";
         } else if (error.message?.includes("0x1770")) {
-          errorMessage = "Milestone amounts don't match total budget";
+          errorMessage = "Job counter not initialized";
+        } else if (error.message?.includes("AccountNotInitialized")) {
+          errorMessage = "Job counter not initialized. Please initialize it first.";
         } else if (error.message) {
           errorMessage = error.message;
         }
@@ -303,7 +314,6 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
         setShowConfirmation(false);
       }
     };
-
     const autoSplitMilestones = () => {
       const budget = parseFloat(formData.budget);
       if (isNaN(budget) || budget <= 0 || formData.milestones.length === 0) return;
@@ -607,7 +617,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
             </motion.div>
           </div>
         </div>
-  
+        
         {/* Confirmation Modal */}
         <ConfirmationModal
           isOpen={showConfirmation}

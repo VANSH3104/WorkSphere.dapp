@@ -115,10 +115,9 @@ impl PortfolioItem {
 #[account]
 pub struct Job {
     pub authority: Pubkey,
-    pub job_id: u64,
     pub client: Pubkey,
     pub freelancer: Option<Pubkey>,
-    pub bidders: Vec<Bid>,
+    pub job_id: u64,
     pub title: String,
     pub description: String,
     pub budget: u64,
@@ -126,32 +125,58 @@ pub struct Job {
     pub status: JobStatus,
     pub created_at: i64,
     pub updated_at: i64,
-    pub milestones: Vec<Milestone>,
+    pub bidders: Vec<Bid>,
     pub reviews: Vec<Review>,
     pub dispute: Option<Dispute>,
     pub skills: Vec<String>,
     pub category: String,
+    pub escrow: Pubkey,
+    pub total_paid: u64,
+    pub work_submitted: bool,
+    pub work_submission_url: String,
+    pub work_submission_description: String,
+    pub work_submitted_at: Option<i64>,
+    pub work_approved: bool,
+    pub work_approved_at: Option<i64>,
 }
 impl Job {
     pub const LEN: usize = 
         32 + // authority
         32 + // client
-        8  +
-        1 + 32 + // freelancer (Option<Pubkey>) - 1 byte for discriminant + 32 for Pubkey
-        4 + (50 * Bid::LEN) + // bidders vec (max 50 bidders) - 4 bytes for length
-        4 + 100 + // title (4 bytes for length + 100 bytes)
-        4 + 1000 + // description (4 bytes for length + 1000 bytes)
+        1 + 32 + // freelancer (Option<Pubkey>)
+        8 +  // job_id (Universal ID)
+        4 + 100 + // title
+        4 + 1000 + // description
         8 + // budget
         8 + // deadline
-        1 + // status (enum - 1 byte for discriminant)
+        1 + // status
         8 + // created_at
         8 + // updated_at
-        4 + (10 * Milestone::LEN) + // milestones vec (max 10 milestones)
-        4 + (10 * Review::LEN) + // reviews vec (max 10 reviews)
-        1 + (1 + Dispute::LEN) + // dispute (Option<Dispute>) - 1 byte for Option + Dispute size
-        4 + (10 * (4 + 50)) + // skills vec (max 10 skills, each max 50 chars)
-        4 + 50; 
+        4 + (50 * Bid::LEN) + // bidders vec
+        4 + (10 * Review::LEN) + // reviews vec
+        1 + (1 + Dispute::LEN) + // dispute
+        4 + (10 * (4 + 50)) + // skills vec
+        4 + 50 + // category
+        32 + // escrow
+        8 + // total_paid
+        1 + // work_submitted
+        4 + 500 + // work_submission_url
+        4 + 1000 + // work_submission_description
+        1 + 8 + // work_submitted_at
+        1 + // work_approved
+        1 + 8; // work_approved_at
 }
+
+#[account]
+pub struct JobCounter {
+    pub count: u64,
+}
+
+impl JobCounter {
+    pub const LEN: usize = 8; // Just the count (u64)
+}
+
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Review {
     pub reviewer: Pubkey,
@@ -204,18 +229,7 @@ pub enum JobStatus {
     Disputed,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct Milestone {
-    pub title: String,
-    pub description: String,
-    pub amount: u64,
-    pub due_date: i64,
-    pub is_completed: bool,
-}
 
-impl Milestone {
-    pub const LEN: usize = 4 + 100 + (4 + 1000) + 8 + 8 + 1;
-}
 impl Review {
     pub const LEN: usize = 32 + 1 + (4 + 500) + 8;
 }

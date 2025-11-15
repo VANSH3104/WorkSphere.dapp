@@ -46,21 +46,28 @@ export const findUserPDA = (authority: PublicKey) =>
   );
 
 
-export const findJobPDA = (authority: PublicKey, jobId: number | BN | bigint) => {
-  // Always convert to BN first, then to 8-byte LE
+export const findJobCounterPDA = () =>
+  PublicKey.findProgramAddressSync(
+    [Buffer.from("job_counter")],
+    programId
+  );
+
+// ✅ FIXED: Job PDA uses universal job ID only (matches your Rust seeds)
+export const findJobPDA = (jobId: number | BN | bigint) => {
   const jobIdBN = new BN(jobId.toString());
   const jobIdBytes = jobIdBN.toArrayLike(Buffer, 'le', 8);
   
-  console.log("🔍 PDA Seeds Debug:");
+  console.log("🔍 Job PDA Seeds Debug:");
   console.log("Job ID:", jobIdBN.toString());
   console.log("Job ID bytes (hex):", Buffer.from(jobIdBytes).toString('hex'));
   
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("job"), authority.toBuffer(), jobIdBytes],
+    [Buffer.from("job"), jobIdBytes], // Only job ID, no authority
     programId
   );
 };
 // ✅ Types
 export type BackendAccounts = IdlAccounts<BackendProgram>;
-export type UserAccount = BackendAccounts["user"]; // Note: lowercase "user"
-export type JobAccount = BackendAccounts["job"];   // Note: lowercase "job"
+export type UserAccount = BackendAccounts["user"];
+export type JobAccount = BackendAccounts["job"];
+export type JobCounterAccount = BackendAccounts["jobCounter"];

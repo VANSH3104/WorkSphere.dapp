@@ -104,11 +104,32 @@
               },
               {
                 "kind": "account",
-                "path": "authority"
-              },
+                "path": "job_counter.count",
+                "account": "JobCounter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "job_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
               {
-                "kind": "arg",
-                "path": "job_id"
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
               }
             ]
           }
@@ -129,10 +150,6 @@
           "type": "string"
         },
         {
-          "name": "job_id",
-          "type": "u64"
-        },
-        {
           "name": "description",
           "type": "string"
         },
@@ -145,16 +162,6 @@
           "type": "i64"
         },
         {
-          "name": "milestones",
-          "type": {
-            "vec": {
-              "defined": {
-                "name": "Milestone"
-              }
-            }
-          }
-        },
-        {
           "name": "skills",
           "type": {
             "vec": "string"
@@ -165,6 +172,55 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "name": "initialize_job_counter",
+      "discriminator": [
+        127,
+        185,
+        121,
+        123,
+        194,
+        122,
+        145,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "job_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "register_user",
@@ -358,6 +414,19 @@
         180,
         202,
         80
+      ]
+    },
+    {
+      "name": "JobCounter",
+      "discriminator": [
+        146,
+        77,
+        173,
+        100,
+        24,
+        53,
+        195,
+        39
       ]
     },
     {
@@ -672,10 +741,6 @@
             "type": "pubkey"
           },
           {
-            "name": "job_id",
-            "type": "u64"
-          },
-          {
             "name": "client",
             "type": "pubkey"
           },
@@ -686,14 +751,8 @@
             }
           },
           {
-            "name": "bidders",
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "Bid"
-                }
-              }
-            }
+            "name": "job_id",
+            "type": "u64"
           },
           {
             "name": "title",
@@ -728,11 +787,11 @@
             "type": "i64"
           },
           {
-            "name": "milestones",
+            "name": "bidders",
             "type": {
               "vec": {
                 "defined": {
-                  "name": "Milestone"
+                  "name": "Bid"
                 }
               }
             }
@@ -766,6 +825,54 @@
           {
             "name": "category",
             "type": "string"
+          },
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_paid",
+            "type": "u64"
+          },
+          {
+            "name": "work_submitted",
+            "type": "bool"
+          },
+          {
+            "name": "work_submission_url",
+            "type": "string"
+          },
+          {
+            "name": "work_submission_description",
+            "type": "string"
+          },
+          {
+            "name": "work_submitted_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "work_approved",
+            "type": "bool"
+          },
+          {
+            "name": "work_approved_at",
+            "type": {
+              "option": "i64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "JobCounter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "count",
+            "type": "u64"
           }
         ]
       }
@@ -789,34 +896,6 @@
           },
           {
             "name": "Disputed"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Milestone",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "title",
-            "type": "string"
-          },
-          {
-            "name": "description",
-            "type": "string"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "due_date",
-            "type": "i64"
-          },
-          {
-            "name": "is_completed",
-            "type": "bool"
           }
         ]
       }
