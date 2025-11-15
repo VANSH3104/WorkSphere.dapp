@@ -1,11 +1,11 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-
-
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { BN } from "@project-serum/anchor";
 import { 
   ArrowLeft,
-  Upload,
   CheckCircle,
   DollarSign,
   Clock
@@ -13,41 +13,125 @@ import {
 import { useToast } from "@/app/hooks/use-toast";
 import { Button } from "@/app/(module)/ui/button";
 import { Label } from "@/app/(module)/ui/label";
-import { Textarea } from "@/app/(module)/ui/textarea";
 import { Input } from "@/app/(module)/ui/input";
 import { useParams, useRouter } from "next/navigation";
+import { getProgram } from "@/(anchor)/setup";
 
+// Import your IDL
+// import idl from "@/idl/your_program.json";
 
 const JobProposalPage = () => {
   const { jobId } = useParams();
   const navigate = useRouter();
-  const userRole = "client";
   const { toast } = useToast();
+  const { publicKey, signTransaction, signAllTransactions , wallet  } = useWallet();
+  const { connection } = useConnection();
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [formData, setFormData] = useState({
-    coverLetter: "",
     bidAmount: "",
-    duration: "2-weeks",
-    attachments: [] as File[]
+    coverLetter: "",
+    skills: [] as string[],
+    experience: "",
   });
 
+
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    toast({
-      title: "Proposal Submitted Successfully! 🎉",
-      description: "The client will review your proposal and get back to you soon.",
-    });
-
-    setTimeout(() => {
-      navigate.push(`/proposals?role=${userRole}`);
-    }, 1500);
-  };
+      e.preventDefault();
+      const program = getProgram(wallet.adapter);
+      
+      // Validation
+      if (!publicKey) {
+        toast({
+          title: "Wallet Not Connected",
+          description: "Please connect your wallet to submit a proposal.",
+          variant: "destructive",
+        });
+        return;
+      }
+  
+      if (!formData.bidAmount || parseFloat(formData.bidAmount) <= 0) {
+        toast({
+          title: "Invalid Bid Amount",
+          description: "Please enter a valid bid amount greater than 0.",
+          variant: "destructive",
+        });
+        return;
+      }
+  
+      setIsSubmitting(true);
+  
+      try {
+        const bidAmountLamports = new BN(parseFloat(formData.bidAmount) * 1e9);
+  
+        // ✅ Use the job account address directly from URL
+        const jobAccount = new PublicKey(jobId);
+  
+        // ✅ Derive user PDA (this is correct)
+        const [userPDA] = PublicKey.findProgramAddressSync(
+          [Buffer.from("user"), publicKey.toBuffer()],
+          program.programId
+        );
+  
+        console.log("Job Account:", jobAccount.toString());
+        console.log("User PDA:", userPDA.toString());
+        console.log("Bid Amount (lamports):", bidAmountLamports.toString());
+        const jobData = await program.account.job.fetch(jobAccount);
+        const numericJobId = jobData.jobId;
+        const tx = await program.methods
+          .submitProposal(
+            new BN(numericJobId),
+          )
+          .accounts({
+            job: jobAccount,
+            user: userPDA,
+            freelancer: publicKey,
+          })
+          .rpc();
+  
+        console.log("Transaction signature:", tx);
+  
+        toast({
+          title: "Proposal Submitted Successfully! 🎉",
+          description: "The client will review your proposal and get back to you soon.",
+        });
+  
+        setTimeout(() => {
+          navigate.push(`/jobs/${jobId}`);
+        }, 1500);
+  
+      } catch (error: any) {
+        console.error("Error submitting proposal:", error);
+        
+        // Handle specific error codes
+        let errorMessage = "Failed to submit proposal. Please try again.";
+        
+        if (error.message?.includes("AccountDiscriminatorMismatch")) {
+          errorMessage = "Invalid job account. Please check the job URL.";
+        } else if (error.message?.includes("JobNotOpen")) {
+          errorMessage = "This job is no longer accepting proposals.";
+        } else if (error.message?.includes("CannotBidOwnJob")) {
+          errorMessage = "You cannot bid on your own job.";
+        } else if (error.message?.includes("NotAFreelancer")) {
+          errorMessage = "You must be registered as a freelancer to submit proposals.";
+        } else if (error.message?.includes("AlreadySubmittedBid")) {
+          errorMessage = "You have already submitted a proposal for this job.";
+        } else if (error.message?.includes("JobAlreadyAssigned")) {
+          errorMessage = "This job has already been assigned to a freelancer.";
+        } else if (error.message?.includes("MaxBidsReached")) {
+          errorMessage = "This job has reached the maximum number of proposals.";
+        } else if (error.message?.includes("UnauthorizedUser")) {
+          errorMessage = "Unauthorized. Please check your wallet connection.";
+        }
+  
+        toast({
+          title: "Submission Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
 
   return (
     <div className="min-h-screen p-6 lg:p-8">
@@ -90,6 +174,19 @@ const JobProposalPage = () => {
           </p>
         </motion.div>
 
+        {/* Wallet Connection Warning */}
+        {!publicKey && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card p-6 mb-6 border-2 border-yellow-500/20"
+          >
+            <p className="text-yellow-500 text-center">
+              ⚠️ Please connect your wallet to submit a proposal
+            </p>
+          </motion.div>
+        )}
+
         {/* Form */}
         <motion.form
           onSubmit={handleSubmit}
@@ -98,91 +195,65 @@ const JobProposalPage = () => {
           transition={{ delay: 0.1 }}
           className="space-y-6"
         >
-          {/* Cover Letter */}
+
+          {/* Bid Amount */}
           <div className="glass-card p-8">
-            <Label htmlFor="coverLetter" className="text-lg font-semibold text-foreground mb-3 block">
-              Cover Letter *
+            <Label htmlFor="bidAmount" className="text-lg font-semibold text-foreground mb-3 block">
+              Your Bid Amount (SOL) *
             </Label>
-            <Textarea
-              id="coverLetter"
-              required
-              rows={10}
-              placeholder="Introduce yourself and explain why you're the perfect fit for this job..."
-              value={formData.coverLetter}
-              onChange={(e) => setFormData({ ...formData, coverLetter: e.target.value })}
-              className="bg-background-elevated border-glass-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-            />
-            <p className="text-sm text-foreground-muted mt-2">
-              Tip: Highlight your relevant experience and explain your approach to the project
-            </p>
-          </div>
-
-          {/* Bid & Duration */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="glass-card p-8">
-              <Label htmlFor="bidAmount" className="text-lg font-semibold text-foreground mb-3 block">
-                Your Bid Amount *
-              </Label>
-              <div className="relative">
-                <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-neon-gold" />
-                <Input
-                  id="bidAmount"
-                  type="number"
-                  required
-                  placeholder="5000"
-                  value={formData.bidAmount}
-                  onChange={(e) => setFormData({ ...formData, bidAmount: e.target.value })}
-                  className="pl-12 h-12 bg-background-elevated border-glass-border focus:border-neon-gold focus:ring-2 focus:ring-neon-gold/20"
-                />
-              </div>
-              <p className="text-sm text-foreground-muted mt-2">
-                Client&apos;s budget: $5,000
-              </p>
-            </div>
-
-            <div className="glass-card p-8">
-              <Label htmlFor="duration" className="text-lg font-semibold text-foreground mb-3 block">
-                Estimated Duration *
-              </Label>
-              <div className="relative">
-                <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-neon-cyan" />
-                <select
-                  id="duration"
-                  required
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                  className="w-full h-12 pl-12 pr-4 bg-background-elevated border border-glass-border rounded-lg text-foreground focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 focus:outline-none transition-all"
-                >
-                  <option value="1-week">1 Week</option>
-                  <option value="2-weeks">2 Weeks</option>
-                  <option value="3-weeks">3 Weeks</option>
-                  <option value="1-month">1 Month</option>
-                  <option value="2-months">2 Months</option>
-                  <option value="3-months+">3+ Months</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* File Upload */}
-          <div className="glass-card p-8">
-            <Label className="text-lg font-semibold text-foreground mb-3 block">
-              Attachments (Optional)
-            </Label>
-            <div className="border-2 border-dashed border-glass-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer group">
-              <Upload className="h-12 w-12 text-foreground-muted mx-auto mb-3 group-hover:text-primary transition-colors" />
-              <p className="text-foreground mb-2">
-                Click to upload or drag and drop
-              </p>
-              <p className="text-sm text-foreground-muted">
-                PDF, DOC, ZIP (Max 10MB)
-              </p>
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                accept=".pdf,.doc,.docx,.zip"
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-neon-gold ">Sol</div>
+              <Input
+                id="bidAmount"
+                type="number"
+                step="0.01"
+                required
+                placeholder="5.00"
+                value={formData.bidAmount}
+                onChange={(e) => setFormData({ ...formData, bidAmount: e.target.value })}
+                className="pl-12 h-14 text-lg bg-background-elevated border-glass-border focus:border-neon-gold focus:ring-2 focus:ring-neon-gold/20"
+                disabled={!publicKey}
               />
+            </div>
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <p className="text-foreground-muted">
+                Enter your proposed amount in SOL
+              </p>
+              <p className="text-neon-gold font-semibold">
+                ≈ ${formData.bidAmount ? (parseFloat(formData.bidAmount) * 141.78).toFixed(2) : '0.00'} USD
+              </p>
+            </div>
+          </div>
+
+
+          {/* Timeline Preview */}
+          <div className="glass-card p-8 bg-gradient-to-br from-neon-purple/5 to-neon-cyan/5">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-neon-cyan/10 rounded-lg">
+                <Clock className="h-6 w-6 text-neon-cyan" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-foreground mb-2">Project Timeline</h3>
+                <p className="text-sm text-foreground-muted mb-3">
+                  Once your proposal is accepted, the client will deposit funds into escrow and you can begin work immediately.
+                </p>
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
+                    <span className="text-foreground-muted">Proposal Review</span>
+                  </div>
+                  <span className="text-foreground-muted">→</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-neon-purple" />
+                    <span className="text-foreground-muted">Escrow Deposit</span>
+                  </div>
+                  <span className="text-foreground-muted">→</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-neon-gold" />
+                    <span className="text-foreground-muted">Start Work</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -199,7 +270,7 @@ const JobProposalPage = () => {
                 type="submit"
                 variant="neon"
                 size="lg"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !publicKey}
                 className="gap-2 min-w-[200px]"
               >
                 {isSubmitting ? (
@@ -217,6 +288,23 @@ const JobProposalPage = () => {
             </div>
           </div>
         </motion.form>
+
+        {/* Info Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="glass-card p-6 mt-6"
+        >
+          <h3 className="font-semibold text-foreground mb-3">📝 Important Notes:</h3>
+          <ul className="space-y-2 text-sm text-foreground-muted">
+            <li>• Your proposal will be stored on the Solana blockchain</li>
+            <li>• You can only submit one proposal per job</li>
+            <li>• Make sure you&apos;re registered as a freelancer before submitting</li>
+            <li>• Transaction fees will apply for submitting your proposal</li>
+            <li>• You cannot bid on jobs you created</li>
+          </ul>
+        </motion.div>
       </div>
     </div>
   );

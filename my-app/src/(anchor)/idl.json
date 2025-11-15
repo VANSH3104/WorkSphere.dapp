@@ -299,6 +299,77 @@
       ]
     },
     {
+      "name": "submit_proposal",
+      "discriminator": [
+        224,
+        38,
+        210,
+        52,
+        167,
+        150,
+        221,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "job_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "freelancer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
+        },
+        {
+          "name": "proposed_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "update_resume",
       "discriminator": [
         91,
@@ -540,6 +611,46 @@
       "code": 6017,
       "name": "CategoryTooLong",
       "msg": "Category too long"
+    },
+    {
+      "code": 6018,
+      "name": "CannotBidOwnJob",
+      "msg": "Cannot bid on your own job"
+    },
+    {
+      "code": 6019,
+      "name": "NotAFreelancer",
+      "msg": "User is not registered as a freelancer"
+    },
+    {
+      "code": 6020,
+      "name": "AlreadySubmittedBid",
+      "msg": "You have already submitted a bid for this job"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidBidAmount",
+      "msg": "Bid amount must be greater than zero"
+    },
+    {
+      "code": 6022,
+      "name": "JobAlreadyAssigned",
+      "msg": "Job has already been assigned to a freelancer"
+    },
+    {
+      "code": 6023,
+      "name": "UnauthorizedUser",
+      "msg": "Unauthorized user"
+    },
+    {
+      "code": 6024,
+      "name": "MaxBidsReached",
+      "msg": "Maximum number of bids reached for this job"
+    },
+    {
+      "code": 6025,
+      "name": "BidExceedsBudget",
+      "msg": "Bid amount exceeds reasonable budget limit"
     }
   ],
   "types": [

@@ -211,7 +211,7 @@ pub mod backend {
         job.freelancer = Some(freelancer);
         job.status = JobStatus::InProgress;
         job.updated_at = now;
-        job.budget = bid_amount; // Update budget to the accepted bid amount
+        job.budget = bid_amount;
 
         msg!(
             "Job '{}' assigned to freelancer: {}. Amount {} SOL transferred to escrow",
@@ -220,6 +220,58 @@ pub mod backend {
             bid_amount
         );
 
+        Ok(())
+    }
+    pub fn submit_proposal(
+        ctx: Context<SubmitProposal>,
+        _job_id: u64,
+        proposed_amount: u64,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let user = &mut ctx.accounts.user;
+        let freelancer = ctx.accounts.freelancer.key();
+        let clock = Clock::get()?;
+        require!(
+            user.authority == freelancer,
+            ErrorCode::UnauthorizedUser
+        );
+        require!(
+            user.is_freelancer,
+            ErrorCode::NotAFreelancer
+        );
+        require!(
+            job.status == JobStatus::Open,
+            ErrorCode::JobNotOpen
+        );
+        require!(
+            job.client != freelancer,
+            ErrorCode::CannotBidOwnJob
+        );
+        require!(
+            job.freelancer.is_none(),
+            ErrorCode::JobAlreadyAssigned
+        );
+        require!(
+            !job.bidders.iter().any(|bid| bid.freelancer == freelancer),
+            ErrorCode::AlreadySubmittedBid
+        );
+        require!(
+            proposed_amount > 0, 
+            ErrorCode::InvalidBidAmount
+        );
+        require!(
+            job.bidders.len() < 50,
+            ErrorCode::MaxBidsReached
+        );
+        let bid = Bid {
+            freelancer,
+            proposed_amount,
+            timestamp: clock.unix_timestamp,
+        };
+        job.bidders.push(bid);
+        job.updated_at = clock.unix_timestamp;
+        user.pending_jobs += 1;
+        
         Ok(())
     }
 }

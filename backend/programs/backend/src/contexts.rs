@@ -89,7 +89,26 @@ pub struct InitializeJobCounter<'info> {
     
     pub system_program: Program<'info, System>,
 }
-
+#[derive(Accounts)]
+#[instruction(job_id: u64)]
+pub struct SubmitProposal<'info> {
+    #[account(
+        mut,
+        seeds = [b"job", job_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub job: Account<'info, Job>,
+    
+    #[account(
+        mut,
+        seeds = [b"user", freelancer.key().as_ref()],
+        bump,
+    )]
+    pub user: Account<'info, User>,
+    
+    #[account(mut)]
+    pub freelancer: Signer<'info>,
+}
 #[derive(Accounts)]
 #[instruction(job_id: u64)] 
 pub struct AssignJob<'info> {

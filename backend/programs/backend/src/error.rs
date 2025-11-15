@@ -38,4 +38,20 @@ pub enum ErrorCode {
     MilestoneAfterDeadline,
     #[msg("Category too long")]
     CategoryTooLong,
+    #[msg("Cannot bid on your own job")]
+    CannotBidOwnJob,
+    #[msg("User is not registered as a freelancer")]
+    NotAFreelancer,
+    #[msg("You have already submitted a bid for this job")]
+    AlreadySubmittedBid,
+    #[msg("Bid amount must be greater than zero")]
+    InvalidBidAmount,
+    #[msg("Job has already been assigned to a freelancer")]
+    JobAlreadyAssigned,
+    #[msg("Unauthorized user")]
+    UnauthorizedUser,
+    #[msg("Maximum number of bids reached for this job")]
+    MaxBidsReached,
+    #[msg("Bid amount exceeds reasonable budget limit")]
+    BidExceedsBudget,
 }

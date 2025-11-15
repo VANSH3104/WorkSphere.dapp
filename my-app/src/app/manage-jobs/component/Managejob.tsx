@@ -12,6 +12,7 @@ import {
   Star,
   Filter,
   Plus,
+  ArrowUpDown,
 } from "lucide-react";
 import { Badge } from "@/app/(module)/ui/badge";
 import { Button } from "@/app/(module)/ui/button";
@@ -20,6 +21,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/(providers)/userProvider";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { fetchJobs } from "@/(anchor)/actions/fetchjob";
+import { PublicKey } from "@solana/web3.js";
+import { ResumeFree } from "./resumeFree";
 
 const ManageJobsPage = () => {
   const navigate = useRouter();
@@ -33,6 +36,7 @@ const ManageJobsPage = () => {
   const [loading, setLoading] = useState(false);
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [bidSort, setBidSort] = useState<"lowToHigh" | "highToLow" | "newest" | "oldest">("newest");
 
   useEffect(() => {
     const loadJobs = async () => {
@@ -53,6 +57,10 @@ const ManageJobsPage = () => {
         });
         
         setJobs(data);
+        // Auto-select first job if none selected
+        if (data.length > 0 && !selectedJob) {
+          setSelectedJob(data[0].publicKey.toString());
+        }
       } catch (err) {
         console.error('Failed to load jobs:', err);
         setError('Failed to load jobs. Please try again.');
@@ -65,37 +73,26 @@ const ManageJobsPage = () => {
     loadJobs();
   }, [wallet?.adapter?.publicKey, statusFilter]);
 
-  // Mock proposals data (you can replace this with real data)
-  const proposals = [
-    {
-      id: "1",
-      freelancer: {
-        name: "Sarah Johnson",
-        rating: 4.9,
-        completedJobs: 127,
-        avatar: "SJ",
-      },
-      bid: 4500,
-      duration: "2 weeks",
-      coverLetter:
-        "I have 5+ years of experience in Solidity development and have audited over 50 smart contracts...",
-      status: "shortlisted",
-    },
-    {
-      id: "2",
-      freelancer: {
-        name: "Michael Chen",
-        rating: 4.8,
-        completedJobs: 89,
-        avatar: "MC",
-      },
-      bid: 5200,
-      duration: "10 days",
-      coverLetter:
-        "As a certified blockchain security expert, I specialize in DeFi protocol audits...",
-      status: "shortlisted",
-    },
-  ];
+  // Get selected job data
+  const selectedJobData = jobs.find(job => job.publicKey.toString() === selectedJob);
+  
+  // Get and sort bidders
+  const realBidders = selectedJobData?.account.bidders || [];
+  
+  const sortedBidders = [...realBidders].sort((a, b) => {
+    switch (bidSort) {
+      case "lowToHigh":
+        return a.proposedAmount.toNumber() - b.proposedAmount.toNumber();
+      case "highToLow":
+        return b.proposedAmount.toNumber() - a.proposedAmount.toNumber();
+      case "newest":
+        return b.timestamp.toNumber() - a.timestamp.toNumber();
+      case "oldest":
+        return a.timestamp.toNumber() - b.timestamp.toNumber();
+      default:
+        return 0;
+    }
+  });
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -120,9 +117,20 @@ const ManageJobsPage = () => {
     return statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
   };
 
-  const formatBudget = (budget: number) => {
-    const budgetlamp = budget/1000000000
+  const formatBudget = (budget: any) => {
+    if (typeof budget === 'object' && budget.toNumber) {
+      const budgetlamp = budget.toNumber() / 1000000000;
+      return `${budgetlamp} SOL`;
+    }
+    const budgetlamp = Number(budget) / 1000000000;
     return `${budgetlamp} SOL`;
+  };
+
+  const formatDate = (timestamp: any) => {
+    if (typeof timestamp === 'object' && timestamp.toNumber) {
+      return new Date(timestamp.toNumber() * 1000).toLocaleDateString();
+    }
+    return new Date(Number(timestamp) * 1000).toLocaleDateString();
   };
 
   if (loading) {
@@ -205,8 +213,20 @@ const ManageJobsPage = () => {
           {/* Jobs List */}
           <div className="lg:col-span-1 space-y-4">
             {jobs.length === 0 ? (
-              
-              <div></div>
+              <Card className="glass-card p-6 text-center">
+                <Users className="h-12 w-12 text-foreground-muted mx-auto mb-3" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No Jobs Found</h3>
+                <p className="text-foreground-muted text-sm mb-4">
+                  You haven't posted any jobs yet or no jobs match your current filter.
+                </p>
+                <Button
+                  variant="neon"
+                  onClick={() => navigate.push(`/manage-jobs/new`)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Post Your First Job
+                </Button>
+              </Card>
             ) : (
               jobs.map((job, index) => (
                 <motion.div
@@ -244,7 +264,7 @@ const ManageJobsPage = () => {
                     <div className="flex items-center justify-between">
                       <span className="text-foreground-muted">Proposals</span>
                       <span className="font-semibold text-foreground">
-                        {proposals.length} {/* Replace with actual proposals count */}
+                        {job.account.bidders.length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -292,111 +312,124 @@ const ManageJobsPage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-4"
               >
-                <div className="glass-card p-6">
-                  <h2 className="text-2xl font-bold text-foreground mb-2">
-                    Proposals Received
-                  </h2>
-                  <p className="text-foreground-muted">
-                    Review and manage applications for your job
-                  </p>
-                </div>
-
-                {proposals.map((proposal, index) => (
-                  <motion.div
-                    key={proposal.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 * index }}
-                    className="glass-card p-6"
-                  >
-                    {/* Freelancer Info */}
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-xl">
-                        {proposal.freelancer.avatar}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-xl font-bold text-foreground">
-                            {proposal.freelancer.name}
-                          </h3>
-                          {proposal.status === "shortlisted" && (
-                            <Badge className="bg-neon-gold/20 text-neon-gold border-neon-gold/30">
-                              ⭐ Shortlisted
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-1 text-neon-gold">
-                            <Star className="h-4 w-4 fill-current" />
-                            <span className="font-semibold">
-                              {proposal.freelancer.rating}
-                            </span>
-                          </div>
-                          <span className="text-foreground-muted">
-                            {proposal.freelancer.completedJobs} jobs completed
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bid Details */}
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="glass-panel p-4 rounded-lg">
-                        <div className="flex items-center gap-2 text-neon-gold mb-1">
-                          <DollarSign className="h-4 w-4" />
-                          <span className="text-sm text-foreground-muted">
-                            Bid Amount
-                          </span>
-                        </div>
-                        <p className="text-xl font-bold text-foreground">
-                          ${proposal.bid}
-                        </p>
-                      </div>
-                      <div className="glass-panel p-4 rounded-lg">
-                        <div className="flex items-center gap-2 text-neon-cyan mb-1">
-                          <Clock className="h-4 w-4" />
-                          <span className="text-sm text-foreground-muted">
-                            Duration
-                          </span>
-                        </div>
-                        <p className="text-xl font-bold text-foreground">
-                          {proposal.duration}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Cover Letter */}
-                    <div className="mb-4">
-                      <h4 className="font-semibold text-foreground mb-2">
-                        Cover Letter
-                      </h4>
-                      <p className="text-foreground-muted line-clamp-3">
-                        {proposal.coverLetter}
+                <Card className="glass-card p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div>
+                      <h2 className="text-2xl font-bold text-foreground mb-2">
+                        Proposals Received
+                      </h2>
+                      <p className="text-foreground-muted">
+                        {realBidders.length} proposal{realBidders.length !== 1 ? 's' : ''} for "{selectedJobData?.account.title}"
                       </p>
                     </div>
+                    
+                    {/* Bid Sorting Filter */}
+                    {realBidders.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <ArrowUpDown className="h-4 w-4 text-foreground-muted" />
+                        <select 
+                          value={bidSort}
+                          onChange={(e) => setBidSort(e.target.value as any)}
+                          className="glass-panel px-3 py-2 rounded-lg text-sm border border-glass-border focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="newest">Newest First</option>
+                          <option value="oldest">Oldest First</option>
+                          <option value="lowToHigh">Bid: Low to High</option>
+                          <option value="highToLow">Bid: High to Low</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </Card>
 
-                    {/* Actions */}
-                    <div className="flex gap-3">
-                      <Button variant="neon" className="flex-1 gap-2">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Hire Now
-                      </Button>
-                      {proposal.status !== "shortlisted" && (
-                        <Button variant="glass" className="gap-2">
-                          <Star className="h-4 w-4" />
-                          Shortlist
+                {sortedBidders.length > 0 ? (
+                  sortedBidders.map((bid, index) => (
+                    <motion.div
+                      key={bid.freelancer.toString() + index}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 * index }}
+                      className="glass-card p-6"
+                    >
+                      {/* Freelancer Info */}
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-xl">
+                          {bid.freelancer.toString().slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-xl font-bold text-foreground">
+                              {bid.freelancer.toString().slice(0, 8)}...
+                            </h3>
+                            <Badge className="bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30">
+                              Active Bidder
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-foreground-muted">
+                              Wallet: {bid.freelancer.toString().slice(0, 16)}...
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bid Details */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="glass-panel p-4 rounded-lg">
+                          <div className="flex items-center gap-2 text-neon-gold mb-1">
+                            <DollarSign className="h-4 w-4" />
+                            <span className="text-sm text-foreground-muted">
+                              Bid Amount
+                            </span>
+                          </div>
+                          <p className="text-xl font-bold text-foreground">
+                            {formatBudget(bid.proposedAmount)}
+                          </p>
+                          <p className="text-xs text-foreground-muted mt-1">
+                            {((bid.proposedAmount.toNumber() / selectedJobData.account.budget.toNumber()) * 100).toFixed(1)}% of budget
+                          </p>
+                        </div>
+                        <div className="glass-panel p-4 rounded-lg">
+                          <div className="flex items-center gap-2 text-neon-cyan mb-1">
+                            <Clock className="h-4 w-4" />
+                            <span className="text-sm text-foreground-muted">
+                              Submitted
+                            </span>
+                          </div>
+                          <p className="text-sm font-bold text-foreground">
+                            {formatDate(bid.timestamp)}
+                          </p>
+                          <p className="text-xs text-foreground-muted mt-1">
+                            {new Date(bid.timestamp.toNumber() * 1000).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="">
+                        <ResumeFree address={bid.freelancer}/>
+                      </div>
+                      {/* Actions */}
+                      <div className="flex gap-3">
+                        <Button variant="neon" className="flex-1 gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Hire This Freelancer
                         </Button>
-                      )}
-                      <Button
-                        variant="glass"
-                        className="gap-2 text-destructive hover:text-destructive"
-                      >
-                        <XOctagon className="h-4 w-4" />
-                        Reject
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <Card className="glass-card p-12 text-center">
+                    <Users className="h-16 w-16 text-foreground-muted mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-foreground mb-2">
+                      No Proposals Yet
+                    </h3>
+                    <p className="text-foreground-muted mb-6">
+                      This job hasn't received any proposals yet. Share the job link to attract freelancers.
+                    </p>
+                    <Button variant="neon">
+                      Share Job Link
+                    </Button>
+                  </Card>
+                )}
               </motion.div>
             ) : (
               <div className="glass-card p-12 text-center">
