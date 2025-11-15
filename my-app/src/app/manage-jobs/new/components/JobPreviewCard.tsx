@@ -107,17 +107,6 @@ export default function JobPreviewCard({ formData }: JobPreviewCardProps) {
             </p>
           </div>
 
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-foreground-muted text-xs">
-              <Clock className="h-4 w-4" />
-              <span>Payment Type</span>
-            </div>
-            <p className="text-sm font-medium text-foreground">
-              {formData.paymentType === "full"
-                ? "Full Payment"
-                : `${formData.milestones.length} Milestones`}
-            </p>
-          </div>
 
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-foreground-muted text-xs">
@@ -130,37 +119,6 @@ export default function JobPreviewCard({ formData }: JobPreviewCardProps) {
           </div>
         </div>
 
-        {/* Milestones Preview */}
-        {formData.paymentType === "milestone" && formData.milestones.length > 0 && (
-          <div className="px-6 pb-6">
-            <div className="bg-background-elevated rounded-lg p-4 space-y-2">
-              <h4 className="text-sm font-semibold text-neon-primary flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Milestones
-              </h4>
-              <div className="space-y-2">
-                {formData.milestones.slice(0, 3).map((milestone, index) => (
-                  <div
-                    key={milestone.id}
-                    className="flex justify-between items-center text-xs"
-                  >
-                    <span className="text-foreground-muted">
-                      {milestone.title || `Milestone ${index + 1}`}
-                    </span>
-                    <span className="text-neon-gold font-medium">
-                      {milestone.amount || 0} SOL
-                    </span>
-                  </div>
-                ))}
-                {formData.milestones.length > 3 && (
-                  <p className="text-xs text-foreground-muted text-center pt-1">
-                    +{formData.milestones.length - 3} more milestones
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Attachments */}
         {formData.attachments.length > 0 && (

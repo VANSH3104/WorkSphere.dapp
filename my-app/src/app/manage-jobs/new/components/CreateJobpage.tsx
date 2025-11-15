@@ -364,7 +364,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
   
         {/* Main Content */}
         <div className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
-          {/* Header */}
+          { /* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -556,34 +556,9 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
                   </div>
                 </div>
   
-                <div>
-                  <Label htmlFor="paymentType" className="text-foreground">Payment Type *</Label>
-                  <Select value={formData.paymentType} onValueChange={(value: "full" | "milestone") => setFormData({ ...formData, paymentType: value })}>
-                    <SelectTrigger className="mt-1.5 bg-background-elevated border-input-border focus:border-border-glow focus:ring-2 focus:ring-primary-glow">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-background-elevated border-glass-border z-50">
-                      <SelectItem value="full" className="focus:bg-glass-primary focus:text-foreground">
-                        Full Payment (Pay on completion)
-                      </SelectItem>
-                      <SelectItem value="milestone" className="focus:bg-glass-primary focus:text-foreground">
-                        Milestone-Based (Pay per milestone)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
   
-              {/* Milestones */}
-              {formData.paymentType === "milestone" && (
-                <MilestoneBuilder
-                  milestones={formData.milestones}
-                  budget={parseFloat(formData.budget) || 0}
-                  onChange={(milestones) => setFormData({ ...formData, milestones })}
-                  onAutoSplit={autoSplitMilestones}
-                  error={errors.milestones}
-                />
-              )}
+              
   
               {/* Action Buttons */}
               <div className="flex gap-4 sticky bottom-4 lg:relative lg:bottom-0">
