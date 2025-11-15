@@ -13,7 +13,7 @@
   import ConfirmationModal from "./ConfirmationModal";
   import { useToast } from "@/app/(module)/ui/use-toast";
   import { useRouter } from "next/navigation";
-  import { findJobCounterPDA, findJobPDA, getProgram, getUserJobCount, programId } from "@/(anchor)/setup";
+  import { findJobCounterPDA, findJobPDA, findUserPDA, getProgram, getUserJobCount, programId } from "@/(anchor)/setup";
   import { useWallet } from "@solana/wallet-adapter-react";
   import { BN } from "@coral-xyz/anchor";
   import * as anchor from "@coral-xyz/anchor";
@@ -202,7 +202,8 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
     
         // 1️⃣ Get job counter PDA to get the next universal job ID
         const [jobCounterPDA] = findJobCounterPDA();
-        
+        const [userPDA] = findUserPDA(wallet.adapter.publicKey);
+
         // Fetch current job counter
         let jobCounter;
         try {
@@ -255,7 +256,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
           category: formData.category,
           universalJobId: nextJobId
         });
-    
+        
         // 4️⃣ Send transaction - CORRECTED to match your Rust function signature
         const tx = await program.methods
           .createJob(
@@ -270,6 +271,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
             job: jobPDA,
             jobCounter: jobCounterPDA, // Add job counter account
             authority: authority,
+            user: userPDA,
             systemProgram: SystemProgram.programId,
           })
           .rpc();

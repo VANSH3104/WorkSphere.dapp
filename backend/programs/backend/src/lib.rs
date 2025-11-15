@@ -119,7 +119,7 @@ pub mod backend {
         let job_counter = &mut ctx.accounts.job_counter;
         let clock = Clock::get()?;
         let now = clock.unix_timestamp;
-        
+        let user = &mut ctx.accounts.user;
         // Validations
         require!(deadline > now, ErrorCode::InvalidDeadline);
         require!(title.len() <= 100, ErrorCode::TitleTooLong);
@@ -158,7 +158,7 @@ pub mod backend {
         job.work_submitted_at = None;
         job.work_approved = false;
         job.work_approved_at = None;
-    
+        user.active_jobs += 1;
         msg!(
             "Job created successfully: {} (Universal ID: {})", 
             job.title, 

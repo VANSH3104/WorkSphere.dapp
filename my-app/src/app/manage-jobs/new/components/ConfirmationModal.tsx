@@ -114,17 +114,6 @@ export default function ConfirmationModal({
               </p>
             </div>
 
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-foreground-muted text-xs">
-                <Clock className="h-4 w-4" />
-                <span>Payment Type</span>
-              </div>
-              <p className="text-sm font-semibold text-foreground">
-                {formData.paymentType === "full"
-                  ? "Full Payment"
-                  : `${formData.milestones.length} Milestones`}
-              </p>
-            </div>
 
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-foreground-muted text-xs">
@@ -157,37 +146,7 @@ export default function ConfirmationModal({
           )}
 
           {/* Milestones */}
-          {formData.paymentType === "milestone" &&
-            formData.milestones.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-foreground-muted">
-                  Milestones ({formData.milestones.length})
-                </h4>
-                <div className="space-y-2">
-                  {formData.milestones.map((milestone, index) => (
-                    <div
-                      key={milestone.id}
-                      className="p-3 rounded-lg bg-background-elevated border border-glass-border"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-foreground">
-                            {index + 1}. {milestone.title}
-                          </p>
-                          <p className="text-xs text-foreground-muted mt-1">
-                            {milestone.description}
-                          </p>
-                        </div>
-                        <span className="text-sm font-bold text-neon-gold ml-3">
-                          {milestone.amount} SOL
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
+         
 
           {/* Important Notice */}
           <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">

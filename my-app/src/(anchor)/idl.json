@@ -137,7 +137,14 @@
         {
           "name": "authority",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "user"
+          ]
+        },
+        {
+          "name": "user",
+          "writable": true
         },
         {
           "name": "system_program",

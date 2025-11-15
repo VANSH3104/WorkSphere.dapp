@@ -2,6 +2,7 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { getProgram, findUserPDA } from "@/(anchor)/setup";
 
 interface UserContextType {
@@ -9,6 +10,7 @@ interface UserContextType {
   isRegistered: boolean | null;
   loading: boolean;
   refetchUser: () => Promise<void>;
+  fetchUserByAddress: (address: string | PublicKey) => Promise<any | null>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -21,6 +23,22 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<any>(null);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
 
+  // Function to fetch any user by their address
+  const fetchUserByAddress = async (address: string | PublicKey): Promise<any | null> => {
+    try {
+      const pubKey = typeof address === 'string' ? new PublicKey(address) : address;
+      const program = getProgram(wallet as any);
+      const [userPDA] = findUserPDA(pubKey);
+      const userAccount = await program.account.user.fetchNullable(userPDA);
+      console.log(userAccount , "account")
+      return userAccount;
+    } catch (error) {
+      console.error("❌ Error fetching user by address:", error);
+      return null;
+    }
+  };
+
+  // Function to check current connected user
   const checkUser = async () => {
     try {
       if (!connected || !publicKey || !wallet) {
@@ -56,8 +74,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [connected, publicKey]);
 
   return (
-    <UserContext.Provider value={{ user, isRegistered, loading, refetchUser: checkUser }}>
-    
+    <UserContext.Provider value={{ 
+      user, 
+      isRegistered, 
+      loading, 
+      refetchUser: checkUser,
+      fetchUserByAddress 
+    }}>
       {children}
     </UserContext.Provider>
   );

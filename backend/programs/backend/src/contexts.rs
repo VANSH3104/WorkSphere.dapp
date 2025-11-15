@@ -66,7 +66,11 @@ pub struct CreateJob<'info> {
     
     #[account(mut)]
     pub authority: Signer<'info>,
-    
+    #[account(
+            mut,
+            has_one = authority,
+    )]
+    pub user: Account<'info, User>,
     pub system_program: Program<'info, System>,
 }
 #[derive(Accounts)]

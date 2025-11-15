@@ -121,7 +121,8 @@ const ManageJobsPage = () => {
   };
 
   const formatBudget = (budget: number) => {
-    return `${budget} SOL`;
+    const budgetlamp = budget/1000000000
+    return `${budgetlamp} SOL`;
   };
 
   if (loading) {
