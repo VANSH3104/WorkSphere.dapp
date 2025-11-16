@@ -353,6 +353,56 @@
       ]
     },
     {
+      "name": "request_revision",
+      "discriminator": [
+        205,
+        195,
+        75,
+        171,
+        242,
+        149,
+        90,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "job_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "client",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
+        },
+        {
+          "name": "revision_description",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "submit_proposal",
       "discriminator": [
         224,
@@ -420,6 +470,81 @@
         {
           "name": "proposed_amount",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "submit_work",
+      "discriminator": [
+        158,
+        80,
+        101,
+        51,
+        114,
+        130,
+        101,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "job_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancer_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "freelancer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
+        },
+        {
+          "name": "work_url",
+          "type": "string"
+        },
+        {
+          "name": "work_description",
+          "type": "string"
         }
       ]
     },
@@ -705,6 +830,26 @@
       "code": 6025,
       "name": "BidExceedsBudget",
       "msg": "Bid amount exceeds reasonable budget limit"
+    },
+    {
+      "code": 6026,
+      "name": "JobNotInProgress",
+      "msg": "Job is not in progress"
+    },
+    {
+      "code": 6027,
+      "name": "NotAssignedFreelancer",
+      "msg": "You are not the assigned freelancer"
+    },
+    {
+      "code": 6028,
+      "name": "NoWorkSubmitted",
+      "msg": "No work has been submitted yet"
+    },
+    {
+      "code": 6029,
+      "name": "UrlTooLong",
+      "msg": "URL too long (max 500 characters)"
     }
   ],
   "types": [
@@ -1032,6 +1177,12 @@
             "name": "work_approved_at",
             "type": {
               "option": "i64"
+            }
+          },
+          {
+            "name": "revision_request",
+            "type": {
+              "option": "string"
             }
           }
         ]

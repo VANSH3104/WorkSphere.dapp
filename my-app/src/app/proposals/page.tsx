@@ -16,7 +16,9 @@ import {
   Award,
   TrendingUp,
   Target,
-  FileText
+  FileText,
+  RefreshCw,
+  MessageSquare
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -56,6 +58,11 @@ interface Job {
     workSubmittedAt: any;
     workApprovedAt: any;
     escrow: PublicKey;
+    revisionRequest?: {
+      reason: string;
+      requestedAt: any;
+      changesRequired: string[];
+    } | null;
   };
 }
 
@@ -90,7 +97,7 @@ interface Proposal {
   bid: number;
   duration: string;
   submittedDate: string;
-  status: "pending" | "shortlisted" | "hired" | "rejected" | "inProgress" | "completed" | "disputed";
+  status: "pending" | "shortlisted" | "assigned" | "hired" | "inProgress" | "completed" | "disputed" | "rejected" | "revisionRequested";
   clientResponse?: string;
   views?: number;
   isAssigned: boolean;
@@ -110,6 +117,7 @@ const ProposalManagementPage = () => {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [selectedRevisionJob, setSelectedRevisionJob] = useState<string | null>(null);
 
   // Helper function to convert BN to number
   const bnToNumber = (bn: any): number => {
@@ -131,11 +139,6 @@ const ProposalManagementPage = () => {
       
       // Comprehensive checks for required data
       if (!userPublicKey || !wallet?.adapter || !user) {
-        console.log("Missing required data:", {
-          hasWalletPublicKey: !!userPublicKey,
-          hasWalletAdapter: !!wallet?.adapter,
-          hasUser: !!user
-        });
         setLoading(false);
         return;
       }
@@ -145,10 +148,7 @@ const ProposalManagementPage = () => {
         
         // Fetch ALL jobs first
         const allJobs = await fetchJobs(wallet.adapter);
-        
-        console.log("All jobs fetched:", allJobs?.length || 0);
-        console.log("Current user public key:", userPublicKey.toString());
-
+        console.log(allJobs)
         // CRITICAL FIX: Only show jobs where freelancer has actually interacted
         const freelancerJobs = (allJobs || []).filter(job => {
           if (!job?.account) return false;
@@ -171,21 +171,10 @@ const ProposalManagementPage = () => {
             }
           });
 
-          console.log(`Job ${job.publicKey.toString()}:`, {
-            title: job.account.title,
-            isAssigned,
-            hasBid,
-            freelancer: jobFreelancer?.toString(),
-            user: userPublicKey.toString(),
-            biddersCount: jobBidders.length,
-            bidders: jobBidders.map((b: any) => b?.freelancer?.toString())
-          });
-
           // ONLY include if freelancer has actually applied (hasBid) or is assigned
           return isAssigned || hasBid;
         });
 
-        console.log("Filtered freelancer jobs:", freelancerJobs.length);
 
         const proposalData: Proposal[] = freelancerJobs.map((job) => {
           const jobStatus = job?.account?.status ? Object.keys(job.account.status)[0] : 'open';
@@ -200,7 +189,6 @@ const ProposalManagementPage = () => {
             if (!bidder?.freelancer) return false;
             try {
               const matches = bidder.freelancer.equals(userPublicKey);
-              console.log("Checking bidder:", bidder.freelancer.toString(), "matches:", matches);
               return matches;
             } catch (e) {
               console.error("Error comparing bidder:", e);
@@ -209,38 +197,27 @@ const ProposalManagementPage = () => {
           });
 
           const hasBid = !!myBid;
-          console.log("✅ Has bid:", hasBid);
-          console.log("✅ My bid data:", myBid);
           
           // Check if freelancer was rejected (had bid but not selected)
           const wasRejected = hasBid && job.account.freelancer && 
                             !job.account.freelancer.equals(PublicKey.default) &&
                             !job.account.freelancer.equals(userPublicKey);
 
-          console.log("✅ Was rejected:", wasRejected);
+          // Check for revision request
+          const hasRevisionRequest = job.account.revisionRequest !== null && 
+                                   job.account.revisionRequest !== undefined;
 
           let status: Proposal["status"] = "pending";
           
           // PERFECTED STATUS DETERMINATION
           if (isAssigned) {
             // Freelancer is hired/assigned
-            switch (jobStatus) {
-              case "open":
-              case "inProgress":
-                if (job.account.workSubmitted) {
-                  status = "inProgress"; // Work submitted, waiting approval
-                } else {
-                  status = "hired"; // Hired but haven't started/submitted work
-                }
-                break;
-              case "completed":
-                status = "completed";
-                break;
-              case "disputed":
-                status = "disputed";
-                break;
-              default:
-                status = "hired";
+            if (hasRevisionRequest) {
+              status = "revisionRequested";
+            } else if (job.account.workSubmitted) {
+              status = "inProgress"; // Work submitted, waiting approval
+            } else {
+              status = "assigned"; // Hired but haven't started/submitted work
             }
           } else if (wasRejected) {
             // Freelancer had bid but wasn't selected
@@ -253,10 +230,8 @@ const ProposalManagementPage = () => {
             status = "pending";
           }
 
-          console.log("✅ Final status:", status);
 
           const budgetLamports = bnToNumber(job.account.budget);
-          console.log(budgetLamports , "budget")
           const bidAmount = budgetLamports /1000000000
           
           const duration = calculateDuration(job.account.createdAt, job.account.deadline);
@@ -281,13 +256,9 @@ const ProposalManagementPage = () => {
               submittedAt: bnToNumber(myBid.submittedAt)
             } : undefined
           };
-
-          console.log("Created proposal item:", proposalItem);
           return proposalItem;
         }).filter((proposal): proposal is Proposal => proposal !== null);
 
-        console.log("Final proposal data:", proposalData);
-        console.log("Number of proposals:", proposalData.length);
         setProposals(proposalData);
       } catch (error) {
         console.error("Failed to load proposals:", error);
@@ -345,6 +316,12 @@ const ProposalManagementPage = () => {
           icon: Star,
           label: "Shortlisted"
         };
+      case "assigned":
+        return {
+          color: "bg-blue-500/20 text-blue-500 border-blue-500/30",
+          icon: Briefcase,
+          label: "Assigned - Start Work"
+        };
       case "hired":
         return {
           color: "bg-success/20 text-success border-success/30",
@@ -353,9 +330,9 @@ const ProposalManagementPage = () => {
         };
       case "inProgress":
         return {
-          color: "bg-blue-500/20 text-blue-500 border-blue-500/30",
-          icon: Briefcase,
-          label: "In Progress"
+          color: "bg-purple-500/20 text-purple-500 border-purple-500/30",
+          icon: RefreshCw,
+          label: "In Progress - Waiting Approval"
         };
       case "completed":
         return {
@@ -375,6 +352,12 @@ const ProposalManagementPage = () => {
           icon: XCircle,
           label: "Not Selected"
         };
+      case "revisionRequested":
+        return {
+          color: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30",
+          icon: MessageSquare,
+          label: "Revision Requested"
+        };
       default:
         return {
           color: "bg-foreground-muted/20 text-foreground-muted",
@@ -391,7 +374,9 @@ const ProposalManagementPage = () => {
 
   const stats = {
     pending: proposals.filter(p => p.status === "pending").length,
-    hired: proposals.filter(p => p.status === "hired" || p.status === "inProgress").length,
+    assigned: proposals.filter(p => p.status === "assigned").length,
+    inProgress: proposals.filter(p => p.status === "inProgress").length,
+    revisionRequested: proposals.filter(p => p.status === "revisionRequested").length,
     completed: proposals.filter(p => p.status === "completed").length,
     rejected: proposals.filter(p => p.status === "rejected").length,
     disputed: proposals.filter(p => p.status === "disputed").length
@@ -409,14 +394,20 @@ const ProposalManagementPage = () => {
     skills: user.resume?.skills || []
   } : null;
 
-  
-
   const handleViewJob = (jobPublicKey: string) => {
     navigate.push(`/jobs/${jobPublicKey}?role=freelancer`);
   };
 
   const handleSubmitWork = (jobPublicKey: string) => {
     navigate.push(`/submit-work/${jobPublicKey}`);
+  };
+
+  const handleViewRevisionRequest = (jobPublicKey: string) => {
+    setSelectedRevisionJob(selectedRevisionJob === jobPublicKey ? null : jobPublicKey);
+  };
+
+  const handleResubmitWork = (jobPublicKey: string) => {
+    navigate.push(`/submit-work/${jobPublicKey}?revision=true`);
   };
 
   if (loading) {
@@ -558,7 +549,7 @@ const ProposalManagementPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
+          className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8"
         >
           <div className="glass-card p-6 hover-lift">
             <div className="flex items-center gap-2 text-warning mb-2">
@@ -569,11 +560,27 @@ const ProposalManagementPage = () => {
           </div>
 
           <div className="glass-card p-6 hover-lift">
-            <div className="flex items-center gap-2 text-success mb-2">
+            <div className="flex items-center gap-2 text-blue-500 mb-2">
               <Briefcase className="h-5 w-5" />
-              <span className="text-sm text-foreground-muted">Hired/Active</span>
+              <span className="text-sm text-foreground-muted">Assigned</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{stats.hired}</p>
+            <p className="text-3xl font-bold text-foreground">{stats.assigned}</p>
+          </div>
+
+          <div className="glass-card p-6 hover-lift">
+            <div className="flex items-center gap-2 text-purple-500 mb-2">
+              <RefreshCw className="h-5 w-5" />
+              <span className="text-sm text-foreground-muted">In Progress</span>
+            </div>
+            <p className="text-3xl font-bold text-foreground">{stats.inProgress}</p>
+          </div>
+
+          <div className="glass-card p-6 hover-lift">
+            <div className="flex items-center gap-2 text-yellow-500 mb-2">
+              <MessageSquare className="h-5 w-5" />
+              <span className="text-sm text-foreground-muted">Revision</span>
+            </div>
+            <p className="text-3xl font-bold text-foreground">{stats.revisionRequested}</p>
           </div>
 
           <div className="glass-card p-6 hover-lift">
@@ -606,8 +613,9 @@ const ProposalManagementPage = () => {
           {[
             { key: "all", label: "All Proposals" },
             { key: "pending", label: "Pending" },
-            { key: "hired", label: "Hired" },
+            { key: "assigned", label: "Assigned" },
             { key: "inProgress", label: "In Progress" },
+            { key: "revisionRequested", label: "Revision" },
             { key: "completed", label: "Completed" },
             { key: "disputed", label: "Disputed" },
             { key: "rejected", label: "Not Selected" }
@@ -628,6 +636,8 @@ const ProposalManagementPage = () => {
           {filteredProposals.map((proposal, index) => {
             const statusConfig = getStatusConfig(proposal.status);
             const StatusIcon = statusConfig.icon;
+            const hasRevisionRequest = proposal.job.account.revisionRequest !== null && 
+                                     proposal.job.account.revisionRequest !== undefined;
 
             return (
               <motion.div
@@ -658,6 +668,12 @@ const ProposalManagementPage = () => {
                         <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">
                           <Clock className="h-3 w-3 mr-1" />
                           Applied
+                        </Badge>
+                      )}
+                      {hasRevisionRequest && (
+                        <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
+                          <MessageSquare className="h-3 w-3 mr-1" />
+                          Revision Requested
                         </Badge>
                       )}
                     </div>
@@ -728,11 +744,80 @@ const ProposalManagementPage = () => {
                   </div>
                 </div>
 
+                {/* Revision Request Section */}
+                {hasRevisionRequest && proposal.job.account.revisionRequest && (
+                  <div className={`glass-panel p-4 rounded-lg mb-4 border-l-4 border-yellow-500 transition-all duration-300 ${
+                    selectedRevisionJob === proposal.id ? 'bg-yellow-500/10' : ''
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-5 w-5 text-yellow-500" />
+                        <span className="font-semibold text-foreground">Revision Requested</span>
+                        <Badge variant="outline" className="text-yellow-500 border-yellow-500/50 text-xs">
+                          {formatRelativeTime(proposal.job.account.revisionRequest.requestedAt)}
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-yellow-500 text-yellow-500 hover:bg-yellow-500/10"
+                        onClick={() => handleViewRevisionRequest(proposal.id)}
+                      >
+                        {selectedRevisionJob === proposal.id ? 'Hide Details' : 'View Details'}
+                      </Button>
+                    </div>
+                    
+                    {selectedRevisionJob === proposal.id && (
+                      <div className="space-y-3 animate-in fade-in duration-300">
+                        <div>
+                          <h4 className="text-sm font-medium text-foreground mb-1">Reason for Revision:</h4>
+                          <p className="text-sm text-foreground-muted bg-black/20 p-3 rounded-lg">
+                            {proposal.job.account.revisionRequest}
+                          </p>
+                        </div>
+                        
+                        {proposal.job.account.revisionRequest.changesRequired && 
+                         proposal.job.account.revisionRequest.changesRequired.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-foreground mb-1">Changes Required:</h4>
+                            <ul className="text-sm text-foreground-muted space-y-1">
+                              {proposal.job.account.revisionRequest.changesRequired.map((change, idx) => (
+                                <li key={idx} className="flex items-start gap-2">
+                                  <span className="text-yellow-500 mt-1">•</span>
+                                  <span>{change}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-3 pt-2">
+                          <Button
+                            className="gap-2 bg-yellow-500 hover:bg-yellow-600"
+                            onClick={() => handleResubmitWork(proposal.id)}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Resubmit Work
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="gap-2 border-yellow-500 text-yellow-500 hover:bg-yellow-500/10"
+                            onClick={() => handleViewJob(proposal.id)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            View Job Details
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Work Submission Status */}
                 {proposal.status === "inProgress" && proposal.job.account.workSubmitted && (
-                  <div className="glass-panel p-4 rounded-lg mb-4 border-l-4 border-green-500">
+                  <div className="glass-panel p-4 rounded-lg mb-4 border-l-4 border-purple-500">
                     <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      <CheckCircle2 className="h-5 w-5 text-purple-500" />
                       <span className="font-semibold text-foreground">Work Submitted</span>
                     </div>
                     <p className="text-sm text-foreground-muted">
@@ -757,14 +842,14 @@ const ProposalManagementPage = () => {
                     View Job Details
                   </Button>
 
-                  {proposal.status === "hired" && (
+                  {proposal.status === "assigned" && (
                     <Button 
                       variant="neon" 
                       className="gap-2"
                       onClick={() => handleSubmitWork(proposal.id)}
                     >
                       <Briefcase className="h-4 w-4" />
-                      Submit work
+                      Start Work
                     </Button>
                   )}
 
@@ -780,7 +865,7 @@ const ProposalManagementPage = () => {
                       </Button>
                       <Button 
                         variant="outline" 
-                        className="gap-2 border-green-500 text-green-500 hover:bg-green-500/10"
+                        className="gap-2 border-purple-500 text-purple-500 hover:bg-purple-500/10"
                         onClick={() => handleSubmitWork(proposal.id)}
                       >
                         <FileText className="h-4 w-4" />

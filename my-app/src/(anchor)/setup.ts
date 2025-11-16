@@ -1,4 +1,4 @@
-import { Program, AnchorProvider, IdlAccounts } from "@coral-xyz/anchor";
+  import { Program, AnchorProvider, IdlAccounts } from "@coral-xyz/anchor";
 import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
 import { Idl } from "@coral-xyz/anchor";
 import BN from 'bn.js';

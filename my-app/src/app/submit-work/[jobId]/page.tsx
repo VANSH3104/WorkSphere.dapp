@@ -15,14 +15,12 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { Badge } from "@/app/(module)/ui/badge";
 import { Button } from "@/app/(module)/ui/button";
 import { Textarea } from "@/app/(module)/ui/textarea";
 import { Input } from "@/app/(module)/ui/input";
 import { toast } from "@/app/(module)/ui/sonner";
-import { fetchJobById, fetchJobByPublicKey } from "@/(anchor)/actions/fetchjob";
-import { useUser } from "@/(providers)/userProvider";
-import BN from "bn.js";
+import { fetchJobByPublicKey } from "@/(anchor)/actions/fetchjob";
+import { findUserPDA, getProgram } from "@/(anchor)/setup";
 
 interface Job {
   publicKey: PublicKey;
@@ -59,8 +57,7 @@ interface Job {
 const SubmitWorkPage = () => {
   const { jobId } = useParams();
   const navigate = useRouter();
-  const { wallet } = useWallet();
-  const { user } = useUser();
+  const { wallet , publicKey } = useWallet();
   
   const [submissionUrl, setSubmissionUrl] = useState("");
   const [submissionDescription, setSubmissionDescription] = useState("");
@@ -110,38 +107,75 @@ const SubmitWorkPage = () => {
   }, [wallet, jobId]);
 
   const handleSubmit = async () => {
-    if (!submissionUrl.trim()) {
-      toast.error("Please provide a submission URL");
-      return;
-    }
-
-    if (!submissionDescription.trim()) {
-      toast.error("Please provide a submission description");
-      return;
-    }
-
-    // Validate URL format
-    try {
-      new URL(submissionUrl);
-    } catch {
-      toast.error("Please enter a valid URL");
-      return;
-    }
-
-    if (!jobData) {
-      toast.error("Job data not found");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      // TODO: Integrate with your blockchain submission function
-      // await submitWork(jobData.publicKey, submissionUrl, submissionDescription);
-      
-      // Simulate blockchain transaction
-      setTimeout(() => {
-        setIsSubmitting(false);
+      if (!submissionUrl.trim()) {
+        toast.error("Please provide a submission URL");
+        return;
+      }
+    
+      if (!submissionDescription.trim()) {
+        toast.error("Please provide a submission description");
+        return;
+      }
+    
+      // Validate URL format
+      try {
+        new URL(submissionUrl);
+      } catch {
+        toast.error("Please enter a valid URL");
+        return;
+      }
+    
+      if (!jobData) {
+        toast.error("Job data not found");
+        return;
+      }
+    
+      if (!wallet?.adapter?.publicKey || !publicKey) {
+        toast.error("Wallet not connected");
+        return;
+      }
+    
+      setIsSubmitting(true);
+    
+      try {
+        const jobAccount = new PublicKey(jobId);
+        const program = getProgram(wallet.adapter);
+        
+        const jobData = await program.account.job.fetch(jobAccount);
+        const numericJobId = jobData.jobId;
+        
+        // Find freelancer's user PDA (this is the key fix)
+        const [freelancerUserPDA] = PublicKey.findProgramAddressSync(
+          [Buffer.from("user"), publicKey.toBuffer()],
+          program.programId
+        );
+    
+        // Verify the freelancer user account exists and matches
+        try {
+          const freelancerUserData = await program.account.user.fetch(freelancerUserPDA);
+          console.log("Freelancer user data:", freelancerUserData);
+        } catch (error) {
+          toast.error("Freelancer profile not found. Please complete your profile first.");
+          setIsSubmitting(false);
+          return;
+        }
+    
+        // Call submit_work
+        const tx = await program.methods
+          .submitWork(
+            numericJobId,
+            submissionUrl,
+            submissionDescription
+          )
+          .accounts({
+            job: jobAccount,
+            freelancerUser: freelancerUserPDA,  // Use the properly derived PDA
+            freelancer: publicKey,
+          })
+          .rpc();
+    
+        console.log("Work submission transaction signature:", tx);
+        
         toast.success("Work submitted successfully – awaiting client review", {
           icon: <CheckCircle2 className="h-5 w-5 text-green-500" />
         });
@@ -150,13 +184,28 @@ const SubmitWorkPage = () => {
         setTimeout(() => {
           navigate.push("/proposals");
         }, 1500);
-      }, 2000);
-    } catch (error) {
-      console.error("Failed to submit work:", error);
-      toast.error("Failed to submit work");
-      setIsSubmitting(false);
-    }
-  };
+        
+      } catch (error: any) {
+        console.error("Failed to submit work:", error);
+        
+        // More specific error handling
+        if (error.message?.includes("JobNotInProgress")) {
+          toast.error("Job is not in progress");
+        } else if (error.message?.includes("NotAssignedFreelancer")) {
+          toast.error("You are not the assigned freelancer for this job");
+        } else if (error.message?.includes("UrlTooLong")) {
+          toast.error("Submission URL is too long (max 500 characters)");
+        } else if (error.message?.includes("DescriptionTooLong")) {
+          toast.error("Description is too long (max 1000 characters)");
+        } else if (error.message?.includes("constraint")) {
+          toast.error("Account validation failed - please ensure your profile is set up correctly");
+        } else {
+          toast.error("Failed to submit work: " + error.message);
+        }
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
 
   const maxChars = 2000;
   const remainingChars = maxChars - submissionDescription.length;

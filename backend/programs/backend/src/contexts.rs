@@ -50,7 +50,7 @@ pub struct CreateJob<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + 2950,
+        space = 8 + 3455,
         seeds = [b"job", job_counter.count.to_le_bytes().as_ref()],
         bump
     )]
@@ -142,4 +142,38 @@ pub struct AssignJob<'info> {
     pub escrow: AccountInfo<'info>,
     
     pub system_program: Program<'info, System>,
+}
+#[derive(Accounts)]
+#[instruction(job_id: u64)]
+pub struct SubmitWork<'info> {
+    #[account(
+        mut,
+        seeds = [b"job", job_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub job: Account<'info, Job>,
+    
+    #[account(
+        mut,
+        seeds = [b"user", freelancer.key().as_ref()],
+        bump,
+        constraint = freelancer_user.authority == freelancer.key()
+    )]
+    pub freelancer_user: Account<'info, User>,
+    
+    #[account(mut)]
+    pub freelancer: Signer<'info>,
+}
+#[derive(Accounts)]
+#[instruction(job_id: u64)]
+pub struct RequestRevision<'info> {
+    #[account(
+        mut,
+        seeds = [b"job", job_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub job: Account<'info, Job>,
+    
+    #[account(mut)]
+    pub client: Signer<'info>,
 }

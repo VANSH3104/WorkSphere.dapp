@@ -27,6 +27,8 @@ import { PublicKey } from "@solana/web3.js";
 import { useUser } from "@/(providers)/userProvider";
 import { fetchJobByPublicKey } from "@/(anchor)/actions/fetchjob";
 import BN from "bn.js";
+import { getProgram } from "@/(anchor)/setup";
+import { toast } from "sonner";
 
 interface Job {
   publicKey: PublicKey;
@@ -92,7 +94,7 @@ const JobDetailPage = () => {
   const navigate = useRouter();
   const searchParams = useSearchParams();
   const userRole = searchParams.get("role") || "client";
-  const { wallet } = useWallet();
+  const { wallet , publicKey } = useWallet();
   const { fetchUserByAddress } = useUser();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +102,9 @@ const JobDetailPage = () => {
   const [freelancerData, setFreelancerData] = useState<UserData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showWorkModal, setShowWorkModal] = useState(false);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [revisionDescription, setRevisionDescription] = useState("");
+  const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
   
   useEffect(() => {
     const loadJob = async () => {
@@ -317,10 +322,58 @@ const JobDetailPage = () => {
 
   const handleAcceptWork = () => {
     console.log("Accepting work for job:", job?.publicKey.toString());
+    // TODO: Implement accept work logic
   };
 
   const handleDispute = () => {
     console.log("Opening dispute for job:", job?.publicKey.toString());
+    // TODO: Implement dispute logic
+  };
+
+  const handleRequestRevision = async () => {
+    if (!job || !wallet?.adapter?.publicKey) return;
+    
+    if (!revisionDescription.trim()) {
+      alert("Please provide a revision description");
+      return;
+    }
+
+    if (revisionDescription.length > 500) {
+      alert("Revision description must be 500 characters or less");
+      return;
+    }
+    if (!wallet?.adapter?.publicKey || !publicKey) {
+      toast.error("Wallet not connected");
+      return;
+    }
+    try {
+      setIsSubmittingRevision(true);
+      const jobAccount = new PublicKey(jobId);
+      const program = getProgram(wallet.adapter);
+      
+      const jobData = await program.account.job.fetch(jobAccount);
+      const numericJobId = jobData.jobId;
+      const tx = await program.methods
+        .requestRevision(numericJobId, revisionDescription)
+        .accounts({
+          job: jobAccount,
+          client: publicKey,
+        })
+        .rpc();
+      
+      console.log("Requesting revision for job:", tx);
+      console.log("Revision description:", revisionDescription);
+      
+      // After successful submission:
+      setShowRevisionModal(false);
+      setRevisionDescription("");
+      alert("Revision request submitted successfully!");
+    } catch (error) {
+      console.error("Failed to request revision:", error);
+      alert("Failed to submit revision request. Please try again.");
+    } finally {
+      setIsSubmittingRevision(false);
+    }
   };
 
   const handleViewWork = () => {
@@ -623,17 +676,6 @@ const JobDetailPage = () => {
                               <FileText className="h-4 w-4" />
                               Review Submitted Work
                             </Button>
-                            {!isWorkApproved && (
-                              <Button 
-                                variant="glass" 
-                                size="lg" 
-                                className="w-full gap-2 text-green-500 hover:text-green-400"
-                                onClick={handleAcceptWork}
-                              >
-                                <ThumbsUp className="h-4 w-4" />
-                                Accept Work & Release Payment
-                              </Button>
-                            )}
                             {isWorkApproved && (
                               <Badge className="w-full justify-center bg-green-500/20 text-green-500 border-green-500/30">
                                 <CheckCircle className="h-4 w-4 mr-2" />
@@ -808,6 +850,7 @@ const JobDetailPage = () => {
         </div>
       </div>
 
+      {/* Work Submission Modal */}
       {showWorkModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <motion.div
@@ -877,11 +920,109 @@ const JobDetailPage = () => {
                 )}
                 <Button
                   variant="glass"
-                  className="flex-1 gap-2 text-red-500 hover:text-red-400"
-                  onClick={handleDispute}
+                  className="flex-1 gap-2 text-orange-500 hover:text-orange-400"
+                  onClick={() => {
+                    setShowWorkModal(false);
+                    setShowRevisionModal(true);
+                  }}
                 >
-                  <AlertTriangle className="h-4 w-4" />
-                  Raise Dispute
+                  <Edit className="h-4 w-4" />
+                  Request Revision
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Revision Request Modal */}
+      {showRevisionModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-6 max-w-lg w-full"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-foreground">Request Work Revision</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowRevisionModal(false);
+                  setRevisionDescription("");
+                }}
+                className="hover:text-neon-cyan"
+              >
+                <XCircle className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Revision Description *
+                </label>
+                <textarea
+                  value={revisionDescription}
+                  onChange={(e) => setRevisionDescription(e.target.value)}
+                  placeholder="Describe what needs to be revised or improved..."
+                  className="w-full h-32 bg-glass-primary border border-glass-border rounded-lg p-3 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-neon-cyan/50 resize-none"
+                  maxLength={500}
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-foreground-muted">
+                    Be specific about what needs to be changed
+                  </p>
+                  <p className="text-xs text-foreground-muted">
+                    {revisionDescription.length}/500
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                <div className="flex gap-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-foreground-muted">
+                    <p className="font-medium text-foreground mb-1">Before requesting a revision:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Clearly describe what needs to be changed</li>
+                      <li>The freelancer will be notified immediately</li>
+                      <li>This does not affect escrow or payment</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="glass"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowRevisionModal(false);
+                    setRevisionDescription("");
+                  }}
+                  disabled={isSubmittingRevision}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="neon"
+                  className="flex-1 gap-2"
+                  onClick={handleRequestRevision}
+                  disabled={isSubmittingRevision || !revisionDescription.trim()}
+                >
+                  {isSubmittingRevision ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Edit className="h-4 w-4" />
+                      Request Revision
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

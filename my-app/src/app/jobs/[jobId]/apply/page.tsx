@@ -72,9 +72,6 @@ const JobProposalPage = () => {
           program.programId
         );
   
-        console.log("Job Account:", jobAccount.toString());
-        console.log("User PDA:", userPDA.toString());
-        console.log("Bid Amount (lamports):", bidAmountLamports.toString());
         const jobData = await program.account.job.fetch(jobAccount);
         const numericJobId = jobData.jobId;
         const tx = await program.methods

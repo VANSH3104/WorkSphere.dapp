@@ -124,7 +124,7 @@ pub struct Job {
     pub deadline: i64,
     pub status: JobStatus,
     pub created_at: i64,
-    pub updated_at: i64,
+    pub updated_at: i64,    
     pub bidders: Vec<Bid>,
     pub reviews: Vec<Review>,
     pub dispute: Option<Dispute>,
@@ -138,6 +138,7 @@ pub struct Job {
     pub work_submitted_at: Option<i64>,
     pub work_approved: bool,
     pub work_approved_at: Option<i64>,
+    pub revision_request: Option<String>
 }
 impl Job {
     pub const LEN: usize = 

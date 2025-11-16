@@ -158,6 +158,7 @@ pub mod backend {
         job.work_submitted_at = None;
         job.work_approved = false;
         job.work_approved_at = None;
+        job.revision_request = None;
         user.active_jobs += 1;
         msg!(
             "Job created successfully: {} (Universal ID: {})", 
@@ -303,4 +304,88 @@ pub mod backend {
         
         Ok(())
     }
+    pub fn submit_work(
+        ctx: Context<SubmitWork>,
+        _job_id: u64,
+        work_url: String,
+        work_description: String,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let freelancer_user = &mut ctx.accounts.freelancer_user;
+        let clock = Clock::get()?;
+        
+        // Validations
+        require!(
+            job.status == JobStatus::InProgress,
+            ErrorCode::JobNotInProgress
+        );
+        require!(
+            job.freelancer == Some(ctx.accounts.freelancer.key()),
+            ErrorCode::NotAssignedFreelancer
+        );
+        require!(
+            work_url.len() <= 500,
+            ErrorCode::UrlTooLong
+        );
+        require!(
+            work_description.len() <= 1000,
+            ErrorCode::DescriptionTooLong
+        );
+        
+        // Update job with work submission
+        job.work_submitted = true;
+        job.work_submission_url = work_url;
+        job.work_submission_description = work_description;
+        job.work_submitted_at = Some(clock.unix_timestamp);
+        job.updated_at = clock.unix_timestamp;
+        job.revision_request = None;
+        
+        msg!(
+            "Work submitted for job '{}' by freelancer: {}",
+            job.title,
+            ctx.accounts.freelancer.key()
+        );
+        
+        Ok(())
+    }
+    pub fn request_revision(
+        ctx: Context<RequestRevision>,
+        _job_id: u64,
+        revision_description: String,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let clock = Clock::get()?;
+        
+        // Validations
+        require!(
+            job.status == JobStatus::InProgress,
+            ErrorCode::JobNotInProgress
+        );
+        require!(
+            job.client == ctx.accounts.client.key(),
+            ErrorCode::NotJobClient
+        );
+        require!(
+            job.work_submitted,
+            ErrorCode::NoWorkSubmitted
+        );
+        require!(
+            revision_description.len() <= 500,
+            ErrorCode::DescriptionTooLong
+        );
+        job.work_submitted = false;
+        job.work_submission_url = String::new();
+        job.work_submission_description = String::new();
+        job.revision_request = Some(revision_description);
+        job.updated_at = clock.unix_timestamp;
+        
+        msg!(
+            "Revision requested for job '{}': {}",
+            job.title,
+            job.revision_request.as_ref().unwrap()
+        );
+        
+        Ok(())
+    }
+
 }

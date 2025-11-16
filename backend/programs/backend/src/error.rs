@@ -54,4 +54,12 @@ pub enum ErrorCode {
     MaxBidsReached,
     #[msg("Bid amount exceeds reasonable budget limit")]
     BidExceedsBudget,
+    #[msg("Job is not in progress")]
+    JobNotInProgress,
+    #[msg("You are not the assigned freelancer")]
+    NotAssignedFreelancer,
+    #[msg("No work has been submitted yet")]
+    NoWorkSubmitted,
+    #[msg("URL too long (max 500 characters)")]
+    UrlTooLong,
 }
