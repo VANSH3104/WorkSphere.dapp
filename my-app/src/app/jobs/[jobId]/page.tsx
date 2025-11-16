@@ -592,16 +592,18 @@ const JobDetailPage = () => {
               {userRole === "freelancer" ? (
                 <>
                   <h3 className="text-xl font-bold text-foreground mb-4">Ready to Apply?</h3>
-                  <Button
-                    variant="neon"
-                    size="lg"
-                    className="w-full mb-3"
-                    onClick={() => navigate.push(`/jobs/${jobId}/apply`)}
-                  >
-                    Submit Proposal
-                  </Button>
-                  <p className="text-sm text-foreground-muted text-center">
-                    {jobStatus === "Open" ? "Accepting proposals" : "Not accepting proposals"}
+                  {jobStatus === "Open" && (
+                    <Button
+                      variant="neon"
+                      size="lg"
+                      className="w-full mb-3"
+                      onClick={() => navigate.push(`/jobs/${jobId}/apply`)}
+                    >
+                      Submit Proposal
+                    </Button>
+                  )}
+                  <p className="text-sm text-foreground-muted text-center text-red-500">
+                    {jobStatus === "Open" ? "Accepting proposals" : "Not accepting proposals already assigned"}
                   </p>
                 </>
               ) : (
