@@ -241,6 +241,8 @@ pub struct WithdrawFromEscrow<'info> {
     pub escrow: AccountInfo<'info>,
     #[account(mut)]
     pub freelancer: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
 }
 #[derive(Accounts)]
 #[instruction(job_id: u64)]

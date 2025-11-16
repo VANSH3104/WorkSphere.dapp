@@ -164,7 +164,7 @@ const ProposalManagementPage = () => {
 
       // Demo blockchain function - rate client and withdraw funds
       const tx = await program.methods
-        .rateClientAndWithdraw(numericJobId, new BN(clientRating))
+        .withdrawFromEscrow(numericJobId, clientRating)
         .accounts({
           job: jobAccount,
           freelancer: publicKey,
@@ -459,13 +459,13 @@ const ProposalManagementPage = () => {
     rejected: proposals.filter(p => p.status === "rejected").length,
     disputed: proposals.filter(p => p.status === "disputed").length
   };
-
+  const totalEarn = user.totalEarnings/1000000000;
   // Calculate freelancer stats from user data with safety checks
   const freelancerStats = user && publicKey ? {
     reputation: bnToNumber(user.reputation || 0),
     activeJobs: bnToNumber(user.activeJobs || 0),
     completedJobs: bnToNumber(user.completedJobs || 0),
-    totalEarnings: bnToNumber(user.totalEarnings || 0),
+    totalEarnings: totalEarn,
     successRate: user.completedJobs && user.activeJobs 
       ? Math.round((bnToNumber(user.completedJobs) / (bnToNumber(user.completedJobs) + bnToNumber(user.cancelledJobs || 0) || 1)) * 100)
       : 0,
@@ -560,7 +560,7 @@ const ProposalManagementPage = () => {
               <div className="text-right">
                 <div className="text-sm text-foreground-muted mb-1">Total Earnings</div>
                 <div className="text-2xl font-bold text-neon-gold">
-                  {lamportsToSOL(freelancerStats.totalEarnings)} SOL
+                  {freelancerStats.totalEarnings} SOL
                 </div>
               </div>
             </div>

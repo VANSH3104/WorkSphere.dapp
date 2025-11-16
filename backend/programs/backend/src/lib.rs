@@ -433,12 +433,21 @@ pub mod backend {
             .reputation
             .checked_add(reputation_points)
             .unwrap();
+        freelancer_user.reputation = freelancer_user
+            .reputation
+            .checked_add(3)
+            .unwrap();
         freelancer_user.pending_jobs = freelancer_user
             .pending_jobs
             .checked_sub(1)
             .unwrap();
         
         // Update client stats
+        client_user.reputation = client_user
+            .reputation
+            .checked_add(5)
+            .unwrap();
+        
         client_user.completed_jobs = client_user
             .completed_jobs
             .checked_add(1)
@@ -493,8 +502,30 @@ pub mod backend {
         
         // Transfer funds from escrow to freelancer
         let escrow_lamports = ctx.accounts.escrow.lamports();
-        **ctx.accounts.escrow.try_borrow_mut_lamports()? -= escrow_lamports;
-        **ctx.accounts.freelancer.try_borrow_mut_lamports()? += escrow_lamports;
+        let job_key = job.key();
+        let seeds = &[
+            b"escrow",
+            job_key.as_ref(),
+            &[ctx.bumps.escrow],
+        ];
+        let signer_seeds = &[&seeds[..]];
+        
+        // Transfer funds from escrow to freelancer using CPI
+        let transfer_ix = system_instruction::transfer(
+            &ctx.accounts.escrow.key(),
+            &ctx.accounts.freelancer.key(),
+            escrow_lamports,
+        );
+        
+        anchor_lang::solana_program::program::invoke_signed(
+            &transfer_ix,
+            &[
+                ctx.accounts.escrow.to_account_info(),
+                ctx.accounts.freelancer.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            signer_seeds,
+        )?;
         
         // Update client reputation
         client_user.reputation = client_user
