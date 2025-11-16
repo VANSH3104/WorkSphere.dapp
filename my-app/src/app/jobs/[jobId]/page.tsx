@@ -17,7 +17,8 @@ import {
   User,
   ExternalLink,
   AlertTriangle,
-  ThumbsUp
+  ThumbsUp,
+  Trash2
 } from "lucide-react";
 import { Badge } from "@/app/(module)/ui/badge";
 import { Button } from "@/app/(module)/ui/button";
@@ -27,7 +28,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useUser } from "@/(providers)/userProvider";
 import { fetchJobByPublicKey } from "@/(anchor)/actions/fetchjob";
 import BN from "bn.js";
-import { getProgram } from "@/(anchor)/setup";
+import { findUserPDA, getProgram } from "@/(anchor)/setup";
 import { toast } from "sonner";
 
 interface Job {
@@ -103,8 +104,12 @@ const JobDetailPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [showWorkModal, setShowWorkModal] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [showAcceptWorkModal, setShowAcceptWorkModal] = useState(false);
   const [revisionDescription, setRevisionDescription] = useState("");
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   useEffect(() => {
     const loadJob = async () => {
@@ -282,7 +287,7 @@ const JobDetailPage = () => {
       location: "Global"
     };
   };
-
+ 
   const getFreelancerInfo = () => {
     if (freelancerData) {
       const totalJobs = freelancerData.activeJobs.toNumber() + 
@@ -319,10 +324,109 @@ const JobDetailPage = () => {
   const isJobInProgress = job?.account.status?.inProgress !== undefined;
   const isWorkSubmitted = job?.account.workSubmitted || false;
   const isWorkApproved = job?.account.workApproved || false;
+  const isJobCompleted = job?.account.status?.completed !== undefined;
 
   const handleAcceptWork = () => {
-    console.log("Accepting work for job:", job?.publicKey.toString());
-    // TODO: Implement accept work logic
+    setShowWorkModal(false);
+    setShowAcceptWorkModal(true);
+  };
+
+  const handleSubmitRating = async () => {
+    if (!job || !wallet?.adapter?.publicKey || !publicKey) {
+      toast.error("Wallet not connected");
+      return;
+    }
+
+    if (rating === 0) {
+      alert("Please select a rating before submitting");
+      return;
+    }
+
+    try {
+      setIsSubmittingRating(true);
+      const jobAccount = new PublicKey(jobId);
+      const program = getProgram(wallet.adapter);
+      
+      const jobData = await program.account.job.fetch(jobAccount);
+      const numericJobId = jobData.jobId;
+      const freelancerPubkey = jobData.freelancer;
+      const [freelancerUserPDA] = PublicKey.findProgramAddressSync(
+            [Buffer.from("user"), freelancerPubkey.toBuffer()],
+            program.programId
+          );
+      const [clientUserPDA] = findUserPDA(wallet.adapter.publicKey)
+      // Demo blockchain function - accept work and submit rating
+      const tx = await program.methods
+        .acceptWork(numericJobId, rating)
+        .accounts({
+          job: jobAccount,
+          clientUser: clientUserPDA,
+          freelancerUser: freelancerUserPDA,
+          client: publicKey,
+        })
+        .rpc();
+      
+      console.log("Work accepted and rated successfully:", tx);
+      console.log("Rating submitted:", rating);
+      
+      // Update local state
+      setJob({
+        ...job,
+        account: {
+          ...job.account,
+          workApproved: true,
+          status: { completed: {} }
+        }
+      });
+      
+      toast.success("Work accepted and rated successfully!");
+      setShowAcceptWorkModal(false);
+      setRating(0);
+    } catch (error) {
+      console.error("Failed to accept work and submit rating:", error);
+      toast.error("Failed to accept work. Please try again.");
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
+  const handleDeleteJob = async () => {
+    if (!job || !wallet?.adapter?.publicKey || !publicKey) {
+      toast.error("Wallet not connected");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to delete this job? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const jobAccount = new PublicKey(jobId);
+      const program = getProgram(wallet.adapter);
+      
+      const jobData = await program.account.job.fetch(jobAccount);
+      const numericJobId = jobData.jobId;
+      
+      // Demo blockchain function - delete job
+      const tx = await program.methods
+        .deleteJob(numericJobId)
+        .accounts({
+          job: jobAccount,
+          authority: publicKey,
+        })
+        .rpc();
+      
+      console.log("Job deleted successfully:", tx);
+      
+      toast.success("Job deleted successfully!");
+      navigate.push('/manage-jobs');
+    } catch (error) {
+      console.error("Failed to delete job:", error);
+      toast.error("Failed to delete job. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleDispute = () => {
@@ -421,7 +525,6 @@ const JobDetailPage = () => {
   const freelancerInfo = getFreelancerInfo();
   const jobSkills = job.account.skills || [];
   const jobCategory = job.account.category || "other";
-
   return (
     <div className="min-h-screen p-6 lg:p-8">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -663,7 +766,24 @@ const JobDetailPage = () => {
                 <>
                   <h3 className="text-xl font-bold text-foreground mb-4">Manage Job</h3>
                   <div className="space-y-3">
-                    {isJobInProgress ? (
+                    {isJobCompleted && job.account.escrow.equals(PublicKey.default) ? (
+                      <>
+                        <Button 
+                          variant="destructive" 
+                          size="lg" 
+                          className="w-full gap-2"
+                          onClick={handleDeleteJob}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {isDeleting ? "Deleting..." : "Delete Job"}
+                        </Button>
+                        <Badge className="w-full justify-center bg-green-500/20 text-green-500 border-green-500/30">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Job Completed
+                        </Badge>
+                      </>
+                    ) : isJobInProgress ? (
                       <>
                         {isWorkSubmitted ? (
                           <>
@@ -812,19 +932,19 @@ const JobDetailPage = () => {
                 </div>
 
                 <div className="space-y-2 pt-4 border-t border-glass-border">
-                  <div className="flex items-center justify-between">
-                    <span className="text-foreground-muted">Jobs Posted</span>
-                    <span className="font-semibold text-foreground">{clientInfo.jobsPosted}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground-muted">Jobs Posted</span>
+                      <span className="font-semibold text-foreground">{clientInfo.jobsPosted}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground-muted">Success Rate</span>
+                      <span className="font-semibold text-foreground  text-green-500">{clientInfo.successRate}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground-muted">Location</span>
+                      <span className="font-semibold text-foreground">{clientInfo.location}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-foreground-muted">Success Rate</span>
-                    <span className="font-semibold text-foreground  text-green-500">{clientInfo.successRate}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-foreground-muted">Location</span>
-                    <span className="font-semibold text-foreground">{clientInfo.location}</span>
-                  </div>
-                </div>
 
                 <div className="pt-4 border-t border-glass-border">
                   <p className="text-sm text-foreground-muted mb-2">Client Address:</p>
@@ -928,6 +1048,104 @@ const JobDetailPage = () => {
                 >
                   <Edit className="h-4 w-4" />
                   Request Revision
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Accept Work with Rating Modal */}
+      {showAcceptWorkModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-6 max-w-lg w-full"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-foreground">Accept Work & Rate Freelancer</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowAcceptWorkModal(false);
+                  setRating(0);
+                }}
+                className="hover:text-neon-cyan"
+              >
+                <XCircle className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-semibold text-foreground mb-3">Rate the Freelancer</h4>
+                <div className="flex justify-center gap-2 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setRating(star)}
+                      className="text-3xl focus:outline-none transition-transform hover:scale-110"
+                    >
+                      {star <= rating ? (
+                        <Star className="h-8 w-8 text-yellow-500 fill-yellow-500" />
+                      ) : (
+                        <Star className="h-8 w-8 text-gray-400 hover:text-yellow-500" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-center text-foreground-muted text-sm">
+                  {rating === 0 ? "Select a rating" : `You rated ${rating} star${rating > 1 ? 's' : ''}`}
+                </p>
+              </div>
+
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                <div className="flex gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-foreground-muted">
+                    <p className="font-medium text-foreground mb-1">Accepting this work will:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Release payment to the freelancer</li>
+                      <li>Mark the job as completed</li>
+                      <li>Submit your rating to the freelancer's profile</li>
+                      <li>Update both parties' reputation scores</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="glass"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowAcceptWorkModal(false);
+                    setRating(0);
+                  }}
+                  disabled={isSubmittingRating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="neon"
+                  className="flex-1 gap-2"
+                  onClick={handleSubmitRating}
+                  disabled={isSubmittingRating || rating === 0}
+                >
+                  {isSubmittingRating ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ThumbsUp className="h-4 w-4" />
+                      Accept & Rate
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

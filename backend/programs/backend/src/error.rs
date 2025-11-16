@@ -62,4 +62,12 @@ pub enum ErrorCode {
     NoWorkSubmitted,
     #[msg("URL too long (max 500 characters)")]
     UrlTooLong,
+    #[msg("Invalid rating. Must be between 1 and 5 stars")]
+    InvalidRating,
+    #[msg("Job is not completed yet")]
+    JobNotCompleted,
+    #[msg("Payment already withdrawn from escrow")]
+    AlreadyWithdrawn,
+    #[msg("Payment has not been completed yet")]
+    PaymentNotCompleted,
 }

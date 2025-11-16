@@ -177,3 +177,82 @@ pub struct RequestRevision<'info> {
     #[account(mut)]
     pub client: Signer<'info>,
 }
+#[derive(Accounts)]
+#[instruction(job_id: u64)]
+pub struct AcceptWork<'info> {
+    #[account(
+        mut,
+        seeds = [b"job", job_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub job: Account<'info, Job>,
+    
+    #[account(
+        mut,
+        seeds = [b"user", client.key().as_ref()],
+        bump,
+        constraint = client_user.authority == client.key()
+    )]
+    pub client_user: Account<'info, User>,
+    
+    #[account(
+        mut,
+        seeds = [b"user", job.freelancer.unwrap().as_ref()],
+        bump,
+        constraint = freelancer_user.authority == job.freelancer.unwrap()
+    )]
+    pub freelancer_user: Account<'info, User>,
+    
+    #[account(mut)]
+    pub client: Signer<'info>,
+}
+#[derive(Accounts)]
+#[instruction(job_id: u64)]
+pub struct WithdrawFromEscrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"job", job_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub job: Account<'info, Job>,
+    
+    #[account(
+        mut,
+        seeds = [b"user", freelancer.key().as_ref()],
+        bump,
+        constraint = freelancer_user.authority == freelancer.key()
+    )]
+    pub freelancer_user: Account<'info, User>,
+    
+    #[account(
+        mut,
+        seeds = [b"user", job.client.as_ref()],
+        bump,
+        constraint = client_user.authority == job.client
+    )]
+    pub client_user: Account<'info, User>,
+    
+    /// CHECK: Escrow PDA holding job funds
+    #[account(
+        mut,
+        seeds = [b"escrow", job.key().as_ref()],
+        bump
+    )]
+    pub escrow: AccountInfo<'info>,
+    #[account(mut)]
+    pub freelancer: Signer<'info>,
+}
+#[derive(Accounts)]
+#[instruction(job_id: u64)]
+pub struct DeleteJob<'info> {
+    #[account(
+        mut,
+        seeds = [b"job", job_id.to_le_bytes().as_ref()],
+        bump,
+        close = authority
+    )]
+    pub job: Account<'info, Job>,
+    
+    #[account(mut)]
+    pub authority: Signer<'info>,
+}

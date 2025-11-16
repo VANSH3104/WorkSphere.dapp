@@ -387,5 +387,169 @@ pub mod backend {
         
         Ok(())
     }
+    pub fn accept_work(
+        ctx: Context<AcceptWork>,
+        _job_id: u64,
+        freelancer_rating: u8,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let client_user = &mut ctx.accounts.client_user;
+        let freelancer_user = &mut ctx.accounts.freelancer_user;
+        let clock = Clock::get()?;
+        
+        // Validations
+        require!(
+            job.status == JobStatus::InProgress,
+            ErrorCode::JobNotInProgress
+        );
+        require!(
+            job.client == ctx.accounts.client.key(),
+            ErrorCode::NotJobClient
+        );
+        require!(
+            job.work_submitted,
+            ErrorCode::NoWorkSubmitted
+        );
+        require!(
+            freelancer_rating >= 1 && freelancer_rating <= 5,
+            ErrorCode::InvalidRating
+        );
+        
+        // Calculate reputation points (5 stars = 25, 4 stars = 20, etc.)
+        let reputation_points = (freelancer_rating as u64) * 5;
+        
+        // Update job status
+        job.status = JobStatus::Completed;
+        job.work_approved = true;
+        job.work_approved_at = Some(clock.unix_timestamp);
+        job.updated_at = clock.unix_timestamp;
+        
+        // Update freelancer stats
+        freelancer_user.completed_jobs = freelancer_user
+            .completed_jobs
+            .checked_add(1)
+            .unwrap();
+        freelancer_user.reputation = freelancer_user
+            .reputation
+            .checked_add(reputation_points)
+            .unwrap();
+        freelancer_user.pending_jobs = freelancer_user
+            .pending_jobs
+            .checked_sub(1)
+            .unwrap();
+        
+        // Update client stats
+        client_user.completed_jobs = client_user
+            .completed_jobs
+            .checked_add(1)
+            .unwrap();
+        client_user.pending_jobs = client_user
+            .pending_jobs
+            .checked_sub(1)
+            .unwrap();
+        client_user.total_spent = client_user
+            .total_spent
+            .checked_add(job.budget)
+            .unwrap();
+        
+        msg!(
+            "Job '{}' completed! Freelancer rated {} stars (+{} reputation)",
+            job.title,
+            freelancer_rating,
+            reputation_points
+        );
+        
+        Ok(())
+    }
+    pub fn withdraw_from_escrow(
+        ctx: Context<WithdrawFromEscrow>,
+        _job_id: u64,
+        client_rating: u8,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let freelancer_user = &mut ctx.accounts.freelancer_user;
+        let client_user = &mut ctx.accounts.client_user;
+        
+        // Validations
+        require!(
+            job.status == JobStatus::Completed,
+            ErrorCode::JobNotCompleted
+        );
+        require!(
+            job.freelancer == Some(ctx.accounts.freelancer.key()),
+            ErrorCode::NotAssignedFreelancer
+        );
+        require!(
+            job.total_paid == 0,
+            ErrorCode::AlreadyWithdrawn
+        );
+        require!(
+            client_rating >= 1 && client_rating <= 5,
+            ErrorCode::InvalidRating
+        );
+        
+        // Calculate reputation points for client
+        let reputation_points = (client_rating as u64) * 5;
+        
+        // Transfer funds from escrow to freelancer
+        let escrow_lamports = ctx.accounts.escrow.lamports();
+        **ctx.accounts.escrow.try_borrow_mut_lamports()? -= escrow_lamports;
+        **ctx.accounts.freelancer.try_borrow_mut_lamports()? += escrow_lamports;
+        
+        // Update client reputation
+        client_user.reputation = client_user
+            .reputation
+            .checked_add(reputation_points)
+            .unwrap();
+        
+        // Update freelancer earnings
+        freelancer_user.total_earnings = freelancer_user
+            .total_earnings
+            .checked_add(job.budget)
+            .unwrap();
+        
+        // Mark as paid
+        
+        job.total_paid = job.budget;
+        job.escrow = Pubkey::default();
+        job.updated_at = Clock::get()?.unix_timestamp;
+        
+        msg!(
+            "Freelancer withdrew {} lamports from escrow. Client rated {} stars (+{} reputation)",
+            escrow_lamports,
+            client_rating,
+            reputation_points
+        );
+        
+        Ok(())
+    }
+    pub fn delete_job(
+        ctx: Context<DeleteJob>,
+        _job_id: u64,
+    ) -> Result<()> {
+        let job = &ctx.accounts.job;
+        
+       
+        require!(
+            job.status == JobStatus::Completed,
+            ErrorCode::JobNotCompleted
+        );
+        require!(
+            job.total_paid == job.budget,
+            ErrorCode::PaymentNotCompleted
+        );
+        require!(
+            job.client == ctx.accounts.authority.key(),
+            ErrorCode::NotJobClient
+        );
+        
+        msg!(
+            "Job '{}' (ID: {}) deleted successfully. Rent refunded to client.",
+            job.title,
+            job.job_id
+        );
+        
+        Ok(())
+    }
 
 }

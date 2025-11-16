@@ -18,7 +18,9 @@ import {
   Target,
   FileText,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  Download,
+  Wallet
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -28,6 +30,8 @@ import { Button } from "../(module)/ui/button";
 import { fetchJobs } from "@/(anchor)/actions/fetchjob";
 import { useUser } from "@/(providers)/userProvider";
 import BN from "bn.js";
+import { getProgram } from "@/(anchor)/setup";
+import { toast } from "sonner";
 
 interface Job {
   publicKey: PublicKey;
@@ -118,6 +122,10 @@ const ProposalManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [selectedRevisionJob, setSelectedRevisionJob] = useState<string | null>(null);
+  const [withdrawingFunds, setWithdrawingFunds] = useState<string | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState<string | null>(null);
+  const [clientRating, setClientRating] = useState(0);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
   // Helper function to convert BN to number
   const bnToNumber = (bn: any): number => {
@@ -130,6 +138,74 @@ const ProposalManagementPage = () => {
   // Helper function to format SOL from lamports
   const lamportsToSOL = (lamports: number): string => {
     return (lamports / 1_000_000_000).toFixed(2);
+  };
+
+  // Function to handle rating submission
+  const handleSubmitRating = async (jobPublicKey: string, proposal: Proposal) => {
+    if (!wallet?.adapter || !publicKey) {
+      toast.error("Wallet not connected");
+      return;
+    }
+
+    if (clientRating === 0) {
+      toast.error("Please select a rating before submitting");
+      return;
+    }
+
+    try {
+      setIsSubmittingRating(true);
+      
+      const program = getProgram(wallet.adapter);
+      const jobAccount = new PublicKey(jobPublicKey);
+      
+      // Fetch current job data
+      const jobData = await program.account.job.fetch(jobAccount);
+      const numericJobId = jobData.jobId;
+
+      // Demo blockchain function - rate client and withdraw funds
+      const tx = await program.methods
+        .rateClientAndWithdraw(numericJobId, new BN(clientRating))
+        .accounts({
+          job: jobAccount,
+          freelancer: publicKey,
+          client: proposal.job.account.client,
+          escrow: proposal.job.account.escrow,
+        })
+        .rpc();
+
+      console.log("Client rated and funds withdrawn successfully:", tx);
+      console.log("Client rating:", clientRating);
+      
+      // Update local state
+      setProposals(prev => prev.map(p => 
+        p.id === jobPublicKey 
+          ? { ...p, status: "completed" as const }
+          : p
+      ));
+
+      toast.success(`Successfully rated client and withdrawn ${proposal.bid.toFixed(2)} SOL!`);
+      setShowRatingModal(null);
+      setClientRating(0);
+      
+    } catch (error) {
+      console.error("Failed to rate client and withdraw funds:", error);
+      toast.error("Failed to complete transaction. Please try again.");
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
+  // Function to open rating modal and withdraw funds
+  const handleWithdrawFunds = async (jobPublicKey: string, proposal: Proposal) => {
+    setShowRatingModal(jobPublicKey);
+  };
+
+  // Check if funds can be withdrawn (job completed and escrow has funds)
+  const canWithdrawFunds = (proposal: Proposal): boolean => {
+    return proposal.status === "completed" && 
+           proposal.isAssigned && 
+           !proposal.job.account.escrow.equals(PublicKey.default) &&
+           proposal.job.account.workApproved;
   };
 
   useEffect(() => {
@@ -214,8 +290,10 @@ const ProposalManagementPage = () => {
             // Freelancer is hired/assigned
             if (hasRevisionRequest) {
               status = "revisionRequested";
-            } else if (job.account.workSubmitted) {
+            } else if (job.account.workSubmitted && !job.account.workApproved) {
               status = "inProgress"; // Work submitted, waiting approval
+            } else if (job.account.workApproved) {
+              status = "completed"; // Work approved, job completed
             } else {
               status = "assigned"; // Hired but haven't started/submitted work
             }
@@ -874,7 +952,18 @@ const ProposalManagementPage = () => {
                     </>
                   )}
 
-                  {proposal.status === "completed" && (
+                  {canWithdrawFunds(proposal) && (
+                    <Button 
+                      variant="neon" 
+                      className="gap-2 bg-green-600 hover:bg-green-700"
+                      onClick={() => handleWithdrawFunds(proposal.id, proposal)}
+                    >
+                      <Wallet className="h-4 w-4" />
+                      Get Money ({proposal.bid.toFixed(2)} SOL)
+                    </Button>
+                  )}
+
+                  {proposal.status === "completed" && !canWithdrawFunds(proposal) && (
                     <Badge className="bg-green-500/20 text-green-500 border-green-500/30 gap-2 text-sm px-4 py-2">
                       <CheckCircle2 className="h-4 w-4" />
                       Payment Released
@@ -914,6 +1003,104 @@ const ProposalManagementPage = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Rating Modal for Withdrawing Funds */}
+      {showRatingModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-6 max-w-lg w-full"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-foreground">Rate Client & Withdraw Funds</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowRatingModal(null);
+                  setClientRating(0);
+                }}
+                className="hover:text-neon-cyan"
+              >
+                <XCircle className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-semibold text-foreground mb-3 text-center">Rate Your Client Experience</h4>
+                <div className="flex justify-center gap-2 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setClientRating(star)}
+                      className="text-3xl focus:outline-none transition-transform hover:scale-110"
+                    >
+                      {star <= clientRating ? (
+                        <Star className="h-8 w-8 text-yellow-500 fill-yellow-500" />
+                      ) : (
+                        <Star className="h-8 w-8 text-gray-400 hover:text-yellow-500" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-center text-foreground-muted text-sm">
+                  {clientRating === 0 ? "Select a rating" : `You rated ${clientRating} star${clientRating > 1 ? 's' : ''}`}
+                </p>
+              </div>
+
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                <div className="flex gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-foreground-muted">
+                    <p className="font-medium text-foreground mb-1">Withdrawing funds will:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Transfer {proposals.find(p => p.id === showRatingModal)?.bid.toFixed(2)} SOL to your wallet</li>
+                      <li>Submit your rating to the client's profile</li>
+                      <li>Update both parties' reputation scores</li>
+                      <li>Close the job permanently</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="glass"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowRatingModal(null);
+                    setClientRating(0);
+                  }}
+                  disabled={isSubmittingRating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="neon"
+                  className="flex-1 gap-2 bg-green-600 hover:bg-green-700"
+                  onClick={() => handleSubmitRating(showRatingModal, proposals.find(p => p.id === showRatingModal)!)}
+                  disabled={isSubmittingRating || clientRating === 0}
+                >
+                  {isSubmittingRating ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Wallet className="h-4 w-4" />
+                      Rate & Withdraw
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

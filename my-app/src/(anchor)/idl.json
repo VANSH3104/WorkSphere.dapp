@@ -8,6 +8,99 @@
   },
   "instructions": [
     {
+      "name": "accept_work",
+      "discriminator": [
+        69,
+        200,
+        92,
+        157,
+        151,
+        9,
+        96,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "job_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "client_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "client"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancer_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.freelancer",
+                "account": "Job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "client",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
+        },
+        {
+          "name": "freelancer_rating",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "assign_job",
       "discriminator": [
         37,
@@ -231,6 +324,52 @@
         {
           "name": "category",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "delete_job",
+      "discriminator": [
+        126,
+        220,
+        31,
+        28,
+        47,
+        124,
+        31,
+        145
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "job_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
         }
       ]
     },
@@ -657,6 +796,122 @@
           }
         }
       ]
+    },
+    {
+      "name": "withdraw_from_escrow",
+      "discriminator": [
+        235,
+        206,
+        216,
+        253,
+        47,
+        163,
+        169,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "job_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancer_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "freelancer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "client_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job.client",
+                "account": "Job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
+        },
+        {
+          "name": "client_rating",
+          "type": "u8"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -850,6 +1105,26 @@
       "code": 6029,
       "name": "UrlTooLong",
       "msg": "URL too long (max 500 characters)"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidRating",
+      "msg": "Invalid rating. Must be between 1 and 5 stars"
+    },
+    {
+      "code": 6031,
+      "name": "JobNotCompleted",
+      "msg": "Job is not completed yet"
+    },
+    {
+      "code": 6032,
+      "name": "AlreadyWithdrawn",
+      "msg": "Payment already withdrawn from escrow"
+    },
+    {
+      "code": 6033,
+      "name": "PaymentNotCompleted",
+      "msg": "Payment has not been completed yet"
     }
   ],
   "types": [
