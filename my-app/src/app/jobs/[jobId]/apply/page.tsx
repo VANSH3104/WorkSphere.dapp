@@ -80,6 +80,7 @@ const JobProposalPage = () => {
         const tx = await program.methods
           .submitProposal(
             new BN(numericJobId),
+            bidAmountLamports
           )
           .accounts({
             job: jobAccount,
@@ -99,30 +100,21 @@ const JobProposalPage = () => {
           navigate.push(`/jobs/${jobId}`);
         }, 1500);
   
-      } catch (error: any) {
-        console.error("Error submitting proposal:", error);
-        
-        // Handle specific error codes
+      }  catch (error: any) {
+        console.error("Full error:", error);
+        alert(error)
         let errorMessage = "Failed to submit proposal. Please try again.";
-        
-        if (error.message?.includes("AccountDiscriminatorMismatch")) {
-          errorMessage = "Invalid job account. Please check the job URL.";
-        } else if (error.message?.includes("JobNotOpen")) {
-          errorMessage = "This job is no longer accepting proposals.";
-        } else if (error.message?.includes("CannotBidOwnJob")) {
-          errorMessage = "You cannot bid on your own job.";
-        } else if (error.message?.includes("NotAFreelancer")) {
-          errorMessage = "You must be registered as a freelancer to submit proposals.";
-        } else if (error.message?.includes("AlreadySubmittedBid")) {
+      
+        // Direct check for the specific error you're seeing
+        if (
+          error.code === 6020 ||
+          error.message?.includes("AlreadySubmittedBid") ||
+          error.message?.includes("6020") ||
+          (error.logs && error.logs.some((log: string) => log.includes("AlreadySubmittedBid")))
+        ) {
           errorMessage = "You have already submitted a proposal for this job.";
-        } else if (error.message?.includes("JobAlreadyAssigned")) {
-          errorMessage = "This job has already been assigned to a freelancer.";
-        } else if (error.message?.includes("MaxBidsReached")) {
-          errorMessage = "This job has reached the maximum number of proposals.";
-        } else if (error.message?.includes("UnauthorizedUser")) {
-          errorMessage = "Unauthorized. Please check your wallet connection.";
         }
-  
+      
         toast({
           title: "Submission Failed",
           description: errorMessage,
@@ -131,7 +123,7 @@ const JobProposalPage = () => {
       } finally {
         setIsSubmitting(false);
       }
-    };
+  }
 
   return (
     <div className="min-h-screen p-6 lg:p-8">
@@ -150,7 +142,7 @@ const JobProposalPage = () => {
         >
           <Button
             variant="ghost"
-            onClick={() => navigate.push(`/jobs/${jobId}`)}
+            onClick={() => navigate.push(`/jobs`)}
             className="gap-2 hover:text-neon-cyan"
           >
             <ArrowLeft className="h-4 w-4" />

@@ -13,16 +13,24 @@ import {
   Filter,
   Plus,
   ArrowUpDown,
+  X,
+  Lock,
+  Shield,
+  AlertCircle,
 } from "lucide-react";
 import { Badge } from "@/app/(module)/ui/badge";
 import { Button } from "@/app/(module)/ui/button";
 import { Card } from "@/app/(module)/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/app/(module)/ui/dialog";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/(providers)/userProvider";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { fetchJobs } from "@/(anchor)/actions/fetchjob";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { ResumeFree } from "./resumeFree";
+import { toast } from "@/app/hooks/use-toast";
+import BN from "bn.js";
+import { findEscrowPDA, findJobPDA, findUserPDA, getProgram } from "@/(anchor)/setup";
 
 const ManageJobsPage = () => {
   const navigate = useRouter();
@@ -37,6 +45,9 @@ const ManageJobsPage = () => {
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [bidSort, setBidSort] = useState<"lowToHigh" | "highToLow" | "newest" | "oldest">("newest");
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedBid, setSelectedBid] = useState<any>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   useEffect(() => {
     const loadJobs = async () => {
@@ -93,6 +104,111 @@ const ManageJobsPage = () => {
         return 0;
     }
   });
+
+  const handleAssignClick = (bid: any) => {
+    setSelectedBid(bid);
+    setAssignDialogOpen(true);
+  };
+
+  const handleAssignJob = async () => {
+    if (!selectedBid || !selectedJobData) return;
+    if (!wallet?.adapter?.publicKey) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet first",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    setIsAssigning(true);
+  
+    try {
+      const program = getProgram(wallet.adapter);
+      const clientPublicKey = wallet.adapter.publicKey;
+      
+      // Get the job ID and derive PDAs
+      const jobId = selectedJobData.account.jobId;
+      const jobIdBN = new BN(jobId);
+      const [jobPDA] = findJobPDA(jobIdBN);
+      const [clientUserPDA] = findUserPDA(clientPublicKey);
+      const [freelancerUserPDA] = findUserPDA(selectedBid.freelancer);
+      const [escrowPDA] = findEscrowPDA(jobPDA);
+  
+      console.log("🔍 Assignment Details:");
+      console.log("Job ID:", jobId.toString());
+      console.log("Job PDA:", jobPDA.toString());
+      console.log("Client PubKey:", clientPublicKey.toString());
+      console.log("Client User PDA:", clientUserPDA.toString());
+      console.log("Freelancer PubKey:", selectedBid.freelancer.toString());
+      console.log("Freelancer User PDA:", freelancerUserPDA.toString());
+      console.log("Escrow PDA:", escrowPDA.toString());
+      console.log("Bid Amount:", selectedBid.proposedAmount.toString());
+      const bidAmountBN = new BN(selectedBid.proposedAmount.toString());
+  
+  
+      // Send transaction
+      const tx = await program.methods
+        .assignJob(
+          jobIdBN,
+          selectedBid.freelancer,
+          bidAmountBN
+        )
+        .accounts({
+          job: jobPDA,
+          client: clientPublicKey,
+          clientUser: clientUserPDA,
+          freelancerUser: freelancerUserPDA,
+          escrow: escrowPDA,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+  
+      console.log("Job assigned successfully! Transaction:", tx);
+  
+      toast({
+        title: "Job Assigned Successfully!",
+        description: `Job assigned to ${selectedBid.freelancer.toString().slice(0, 8)}... Transaction: ${tx.slice(0, 8)}...`,
+        variant: "default",
+      });
+  
+      setAssignDialogOpen(false);
+      setSelectedBid(null);
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+  
+    } catch (error: any) {
+      console.error("❌ FULL ERROR:", error);
+      console.error("❌ Error logs:", error.logs);
+  
+      let errorMessage = "Failed to assign job";
+  
+      // Parse specific errors
+      if (error.message?.includes("BidNotFound")) {
+        errorMessage = "The selected bid was not found";
+      } else if (error.message?.includes("JobNotOpen")) {
+        errorMessage = "This job is no longer open for assignment";
+      } else if (error.message?.includes("NotJobClient")) {
+        errorMessage = "You are not the owner of this job";
+      } else if (error.message?.includes("InsufficientBalance")) {
+        errorMessage = "Insufficient balance to escrow the bid amount";
+      } else if (error.message?.includes("0x1")) {
+        errorMessage = "Transaction failed - please check your balance";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+  
+      toast({
+        title: "Assignment Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -409,7 +525,11 @@ const ManageJobsPage = () => {
                       </div>
                       {/* Actions */}
                       <div className="flex gap-3">
-                        <Button variant="neon" className="flex-1 gap-2">
+                        <Button 
+                          variant="neon" 
+                          className="flex-1 gap-2"
+                          onClick={() => handleAssignClick(bid)}
+                        >
                           <CheckCircle2 className="h-4 w-4" />
                           Hire This Freelancer
                         </Button>
@@ -447,6 +567,175 @@ const ManageJobsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Assign Job Dialog - Compact and Responsive */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="glass-card max-w-md sm:max-w-lg border-0 p-0 overflow-hidden">
+          <div className="relative">
+            {/* Header */}
+            <DialogHeader className="p-4 sm:p-6 border-b border-glass-border">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-xl sm:text-2xl font-bold text-foreground">
+                  Assign Job
+                </DialogTitle>
+                
+              </div>
+              <DialogDescription className="text-foreground-muted mt-1 text-sm">
+                Confirm job assignment to freelancer
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Content */}
+            <div className="p-4 sm:p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* Assignment Summary */}
+              <div className="glass-panel p-3 sm:p-4 rounded-lg">
+                <h4 className="font-semibold text-foreground mb-2 text-sm sm:text-base">Assignment Details</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-foreground-muted">Freelancer</span>
+                    <span className="font-semibold text-xs sm:text-sm">
+                      {selectedBid?.freelancer.toString().slice(0, 8)}...
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-foreground-muted">Bid Amount</span>
+                    <span className="font-semibold text-neon-gold text-sm">
+                      {selectedBid && formatBudget(selectedBid.proposedAmount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-foreground-muted">Job</span>
+                    <span className="font-semibold text-right text-xs sm:text-sm max-w-[150px] truncate">
+                      {selectedJobData?.account.title}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Escrow Process */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-foreground flex items-center gap-2 text-sm sm:text-base">
+                  <Lock className="h-4 w-4 text-neon-cyan" />
+                  Escrow Process
+                </h4>
+                
+                <div className="space-y-2 text-xs sm:text-sm">
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-neon-cyan flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-white text-xs font-bold">1</span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">Funds Locked</p>
+                      <p className="text-foreground-muted">
+                        {selectedBid && formatBudget(selectedBid.proposedAmount)} secured in escrow
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-glass-border flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-foreground-muted text-xs font-bold">2</span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground-muted">Work Progress</p>
+                      <p className="text-foreground-muted">
+                        Freelancer works with protected funds
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-glass-border flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-foreground-muted text-xs font-bold">3</span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground-muted">Completion</p>
+                      <p className="text-foreground-muted">
+                        Review and approve work
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 h-4 rounded-full bg-glass-border flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-foreground-muted text-xs font-bold">4</span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground-muted">Release</p>
+                      <p className="text-foreground-muted">
+                        Funds released to freelancer
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Escrow Protection */}
+              <div className="glass-panel p-3 sm:p-4 rounded-lg border border-neon-cyan/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-4 w-4 text-neon-cyan" />
+                  <h4 className="font-semibold text-foreground text-sm sm:text-base">Escrow Protection</h4>
+                </div>
+                <div className="space-y-1 text-xs sm:text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-foreground-muted">Project Cost</span>
+                    <span className="font-semibold">
+                      {selectedBid && formatBudget(selectedBid.proposedAmount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-foreground-muted">Status</span>
+                    <Badge className="bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30 text-xs">
+                      Ready
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Note */}
+              <div className="flex items-start gap-2 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                <div className="text-xs">
+                  <p className="font-medium text-yellow-500 mb-1">Security Notice</p>
+                  <p className="text-yellow-600">
+                    Funds secured in escrow until work approval.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 p-4 sm:p-6 border-t border-glass-border bg-glass-secondary/50">
+              <Button
+                variant="glass"
+                onClick={() => setAssignDialogOpen(false)}
+                className="flex-1 text-sm"
+                disabled={isAssigning}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="neon"
+                onClick={handleAssignJob}
+                className="flex-1 gap-2 text-sm"
+                disabled={isAssigning}
+              >
+                {isAssigning ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Confirm
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

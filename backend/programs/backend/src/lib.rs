@@ -172,32 +172,45 @@ pub mod backend {
         msg!("Job counter initialized to 0");
         Ok(())
     }
-    pub fn assign_job(ctx: Context<AssignJob>,job_id: u64, freelancer: Pubkey, bid_amount: u64) -> Result<()> {
+    pub fn assign_job(
+        ctx: Context<AssignJob>, 
+        _job_id: u64, 
+        freelancer: Pubkey, 
+        bid_amount: u64
+    ) -> Result<()> {
         let job = &mut ctx.accounts.job;
         let clock = Clock::get()?;
+        let freelancer_user = &mut ctx.accounts.freelancer_user;
+        let client_user = &mut ctx.accounts.client_user;
         let now = clock.unix_timestamp;
-        let jobId = job_id;
-        // Verify the freelancer has bid on this job
+        
+        // Verify bid exists
         let bid_exists = job
             .bidders
             .iter()
             .any(|bid| bid.freelancer == freelancer && bid.proposed_amount == bid_amount);
         require!(bid_exists, ErrorCode::BidNotFound);
-
+    
+        // Verify job is open
+        require!(job.status == JobStatus::Open, ErrorCode::JobNotOpen);
+        
+        // Verify client is the job owner
+        require!(job.client == ctx.accounts.client.key(), ErrorCode::NotJobClient);
+    
         // Verify client has enough SOL for escrow
         let client_lamports = ctx.accounts.client.lamports();
         require!(
             client_lamports >= bid_amount,
             ErrorCode::InsufficientBalance
         );
-
+    
         // Transfer funds to escrow
         let transfer_ix = system_instruction::transfer(
             &ctx.accounts.client.key(),
             &ctx.accounts.escrow.key(),
             bid_amount,
         );
-
+    
         anchor_lang::solana_program::program::invoke(
             &transfer_ix,
             &[
@@ -206,20 +219,36 @@ pub mod backend {
                 ctx.accounts.system_program.to_account_info(),
             ],
         )?;
-
+        
+        // Update freelancer counters
+        freelancer_user.pending_jobs = freelancer_user
+            .pending_jobs
+            .checked_add(1).unwrap();
+            
+        // Update job counters for client
+        client_user.pending_jobs = client_user
+            .pending_jobs
+            .checked_add(1)
+            .unwrap();
+        client_user.active_jobs = client_user
+            .active_jobs
+            .checked_sub(1)
+            .unwrap();
+        
         // Update job status and assign freelancer
         job.freelancer = Some(freelancer);
         job.status = JobStatus::InProgress;
         job.updated_at = now;
         job.budget = bid_amount;
-
+        job.escrow = ctx.accounts.escrow.key(); 
+    
         msg!(
-            "Job '{}' assigned to freelancer: {}. Amount {} SOL transferred to escrow",
+            "Job '{}' assigned to freelancer: {}. Amount {} lamports transferred to escrow",
             job.title,
             freelancer,
             bid_amount
         );
-
+    
         Ok(())
     }
     pub fn submit_proposal(

@@ -66,6 +66,11 @@ export const findJobCounterPDA = () =>
       programId
     );
   };
+  export const findEscrowPDA = (jobPDA: PublicKey) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("escrow"), jobPDA.toBuffer()],
+      programId
+    );
 // ✅ Types
 export type BackendAccounts = IdlAccounts<BackendProgram>;
 export type UserAccount = BackendAccounts["user"];

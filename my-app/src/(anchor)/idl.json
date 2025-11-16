@@ -34,11 +34,6 @@
                 ]
               },
               {
-                "kind": "account",
-                "path": "job.client",
-                "account": "Job"
-              },
-              {
                 "kind": "arg",
                 "path": "job_id"
               }
@@ -51,10 +46,69 @@
           "signer": true
         },
         {
-          "name": "freelancer"
+          "name": "client_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "client"
+              }
+            ]
+          }
         },
         {
-          "name": "escrow"
+          "name": "freelancer_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "freelancer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
         },
         {
           "name": "system_program",
@@ -63,7 +117,7 @@
       ],
       "args": [
         {
-          "name": "job_id",
+          "name": "_job_id",
           "type": "u64"
         },
         {

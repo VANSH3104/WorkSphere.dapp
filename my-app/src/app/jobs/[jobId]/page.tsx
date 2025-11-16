@@ -14,13 +14,15 @@ import {
   Edit,
   XCircle,
   MapPin,
-  User
+  User,
+  ExternalLink,
+  AlertTriangle,
+  ThumbsUp
 } from "lucide-react";
 import { Badge } from "@/app/(module)/ui/badge";
 import { Button } from "@/app/(module)/ui/button";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
-
 import { PublicKey } from "@solana/web3.js";
 import { useUser } from "@/(providers)/userProvider";
 import { fetchJobByPublicKey } from "@/(anchor)/actions/fetchjob";
@@ -43,6 +45,13 @@ interface Job {
     category?: string;
     skills?: string[];
     bidders?: any[];
+    workSubmitted: boolean;
+    workApproved: boolean;
+    workSubmissionUrl: string;
+    workSubmissionDescription: string;
+    workSubmittedAt: any;
+    workApprovedAt: any;
+    escrow: PublicKey;
   };
 }
 
@@ -88,7 +97,9 @@ const JobDetailPage = () => {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [clientData, setClientData] = useState<UserData | null>(null);
+  const [freelancerData, setFreelancerData] = useState<UserData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showWorkModal, setShowWorkModal] = useState(false);
   
   useEffect(() => {
     const loadJob = async () => {
@@ -105,15 +116,18 @@ const JobDetailPage = () => {
         if (jobData) {
           setJob(jobData);
           
-          // Fetch client data AFTER job data is set
           try {
             const clientAddress = jobData.account.client.toBase58();
             const clientUserData = await fetchUserByAddress(clientAddress);
             setClientData(clientUserData);
-            console.log("Client data:", clientUserData);
+
+            if (jobData.account.freelancer) {
+              const freelancerAddress = jobData.account.freelancer.toBase58();
+              const freelancerUserData = await fetchUserByAddress(freelancerAddress);
+              setFreelancerData(freelancerUserData);
+            }
           } catch (clientError) {
-            console.error("Failed to fetch client data:", clientError);
-            // Continue even if client data fails
+            console.error("Failed to fetch user data:", clientError);
           }
         } else {
           setError('Job not found');
@@ -129,7 +143,6 @@ const JobDetailPage = () => {
     loadJob();
   }, [wallet?.adapter?.publicKey, jobId, fetchUserByAddress]);
 
-  // Format BN budget from lamports to SOL
   const formatBudget = (budget: any): string => {
     if (!budget) return "0 SOL";
     
@@ -143,14 +156,12 @@ const JobDetailPage = () => {
     return `${solAmount.toFixed(2)} SOL`;
   };
 
-  // Format job status for display
   const formatJobStatus = (status: any) => {
     if (!status) return "Unknown";
     const statusKey = Object.keys(status)[0];
     return statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
   };
 
-  // Format timestamp to readable date
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "Unknown";
     
@@ -168,7 +179,6 @@ const JobDetailPage = () => {
     });
   };
 
-  // Format relative time
   const formatRelativeTime = (timestamp: any) => {
     if (!timestamp) return "Unknown";
     
@@ -189,7 +199,6 @@ const JobDetailPage = () => {
     return `${Math.floor(diff / 604800)} weeks ago`;
   };
 
-  // Format deadline
   const formatDeadline = (deadline: any) => {
     if (!deadline) return "Not set";
     
@@ -211,7 +220,6 @@ const JobDetailPage = () => {
     return `${Math.ceil(diffDays / 30)} months`;
   };
 
-  // Get status color
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "open":
@@ -230,33 +238,28 @@ const JobDetailPage = () => {
     }
   };
 
-  // Get number of proposals
   const getProposalCount = (bidders: any[] | undefined): number => {
     if (!bidders || !Array.isArray(bidders)) return 0;
     return bidders.length;
   };
 
-  // Format reputation from BN to number (assuming 10000 = 100.00)
   const formatReputation = (reputation: BN): number => {
     return reputation.toNumber();
   };
 
-  // Get enhanced client info with proper BN extraction
   const getClientInfo = (): ClientInfo => {
-    // If we have actual user data, use it
     if (clientData) {
       const totalJobs = clientData.activeJobs.toNumber() + 
                        clientData.cancelledJobs.toNumber() + 
                        clientData.completedJobs.toNumber() + 
                        clientData.pendingJobs.toNumber();
-      console.log(clientData.activeJobs.toNumber(), "number")
       const successRate = totalJobs > 0 ? 
         (clientData.completedJobs.toNumber() / totalJobs) * 100 : 0;
 
       return {
         name: clientData.name || "Anonymous Client",
         rating: formatReputation(clientData.reputation),
-        verified: clientData.reputation.toNumber() >= 50, // Example threshold
+        verified: clientData.reputation.toNumber() >= 50,
         jobsPosted: totalJobs,
         hireRate: successRate,
         location: "Global",
@@ -265,7 +268,6 @@ const JobDetailPage = () => {
       };
     }
 
-    // Fallback when clientData is not available yet
     return {
       name: "Loading...",
       rating: 0,
@@ -274,6 +276,67 @@ const JobDetailPage = () => {
       hireRate: 0,
       location: "Global"
     };
+  };
+
+  const getFreelancerInfo = () => {
+    if (freelancerData) {
+      const totalJobs = freelancerData.activeJobs.toNumber() + 
+                       freelancerData.cancelledJobs.toNumber() + 
+                       freelancerData.completedJobs.toNumber() + 
+                       freelancerData.pendingJobs.toNumber();
+      const successRate = totalJobs > 0 ? 
+        (freelancerData.completedJobs.toNumber() / totalJobs) * 100 : 0;
+
+      return {
+        name: freelancerData.name || "Anonymous Freelancer",
+        rating: formatReputation(freelancerData.reputation),
+        verified: freelancerData.reputation.toNumber() >= 50,
+        jobsCompleted: freelancerData.completedJobs.toNumber(),
+        successRate: successRate,
+        location: "Global",
+        totalEarnings: freelancerData.totalEarnings.toNumber() / 1000000000,
+        activeJobs: freelancerData.activeJobs.toNumber(),
+      };
+    }
+
+    return {
+      name: "Not assigned",
+      rating: 0,
+      verified: false,
+      jobsCompleted: 0,
+      successRate: 0,
+      location: "Global",
+      totalEarnings: 0,
+      activeJobs: 0,
+    };
+  };
+
+  const isJobInProgress = job?.account.status?.inProgress !== undefined;
+  const isWorkSubmitted = job?.account.workSubmitted || false;
+  const isWorkApproved = job?.account.workApproved || false;
+
+  const handleAcceptWork = () => {
+    console.log("Accepting work for job:", job?.publicKey.toString());
+  };
+
+  const handleDispute = () => {
+    console.log("Opening dispute for job:", job?.publicKey.toString());
+  };
+
+  const handleViewWork = () => {
+    if (job?.account.workSubmissionUrl) {
+      window.open(job.account.workSubmissionUrl, '_blank');
+    }
+  };
+
+  const formatWorkSubmissionDate = () => {
+    if (!job?.account.workSubmittedAt) return "Not submitted";
+    return formatRelativeTime(job.account.workSubmittedAt);
+  };
+
+  const formatWorkApprovalDate = () => {
+    if (!job?.account.workApprovedAt) return "Not approved";
+    return formatRelativeTime(job.account.workApprovedAt);
   };
 
   if (loading) {
@@ -302,38 +365,47 @@ const JobDetailPage = () => {
   const deadline = formatDeadline(job.account.deadline);
   const proposalsCount = getProposalCount(job.account.bidders);
   const clientInfo = getClientInfo();
+  const freelancerInfo = getFreelancerInfo();
   const jobSkills = job.account.skills || [];
   const jobCategory = job.account.category || "other";
 
   return (
     <div className="min-h-screen p-6 lg:p-8">
-      {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-neon-purple/5 rounded-full blur-3xl animate-float" />
         <div className="absolute bottom-1/4 right-1/3 w-80 h-80 bg-neon-cyan/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
       </div>
 
       <div className="max-w-6xl mx-auto relative z-10">
-        {/* Back Button */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           className="mb-6"
         >
-          <Button
-            variant="ghost"
-            onClick={() => navigate.push(`/manage-jobs`)}
-            className="gap-2 hover:text-neon-cyan"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Jobs
-          </Button>
+          {userRole == 'client' ? (
+            <Button
+              variant="ghost"
+              onClick={() => navigate.push(`/manage-jobs`)}
+              className="gap-2 hover:text-neon-cyan"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Jobs
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => navigate.push(`/jobs`)}
+              className="gap-2 hover:text-neon-cyan"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Jobs
+            </Button>
+          )}
+          
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Job Header */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -362,7 +434,6 @@ const JobDetailPage = () => {
                 </div>
               </div>
 
-              {/* Key Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
                 <div className="glass-panel p-4 rounded-lg">
                   <div className="flex items-center gap-2 text-neon-gold mb-1">
@@ -400,7 +471,6 @@ const JobDetailPage = () => {
               </div>
             </motion.div>
 
-            {/* Description */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -415,7 +485,6 @@ const JobDetailPage = () => {
               </div>
             </motion.div>
 
-            {/* Skills Required */}
             {jobSkills.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -437,7 +506,6 @@ const JobDetailPage = () => {
               </motion.div>
             )}
 
-            {/* Job Details */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -456,6 +524,18 @@ const JobDetailPage = () => {
                       </p>
                     </div>
                   </div>
+                  
+                  {isJobInProgress && job.account.freelancer && (
+                    <div className="flex items-center gap-3">
+                      <User className="h-5 w-5 text-neon-purple" />
+                      <div>
+                        <p className="text-sm text-foreground-muted">Assigned Freelancer</p>
+                        <p className="font-medium text-foreground">
+                          {freelancerInfo.name}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="flex items-center gap-3">
                     <Calendar className="h-5 w-5 text-neon-purple" />
@@ -486,14 +566,24 @@ const JobDetailPage = () => {
                       </p>
                     </div>
                   </div>
+
+                  {isJobInProgress && (
+                    <div className="flex items-center gap-3">
+                      <DollarSign className="h-5 w-5 text-green-500" />
+                      <div>
+                        <p className="text-sm text-foreground-muted">Escrow Address</p>
+                        <p className="font-medium text-foreground text-xs">
+                          {job.account.escrow.toString().slice(0, 8)}...
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Action Card */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -518,31 +608,139 @@ const JobDetailPage = () => {
                 <>
                   <h3 className="text-xl font-bold text-foreground mb-4">Manage Job</h3>
                   <div className="space-y-3">
-                    <Button 
-                      variant="neon" 
-                      size="lg" 
-                      className="w-full gap-2"
-                      onClick={() => navigate.push(`/manage-jobs?selected=${job.publicKey.toString()}`)}
-                    >
-                      <Users className="h-4 w-4" />
-                      View Proposals ({proposalsCount})
-                    </Button>
-                    <Button variant="glass" size="lg" className="w-full gap-2">
-                      <Edit className="h-4 w-4" />
-                      Edit Job
-                    </Button>
-                    {jobStatus === "Open" && (
-                      <Button variant="glass" size="lg" className="w-full gap-2 text-destructive hover:text-destructive">
-                        <XCircle className="h-4 w-4" />
-                        Close Job
-                      </Button>
+                    {isJobInProgress ? (
+                      <>
+                        {isWorkSubmitted ? (
+                          <>
+                            <Button 
+                              variant="neon" 
+                              size="lg" 
+                              className="w-full gap-2"
+                              onClick={() => setShowWorkModal(true)}
+                            >
+                              <FileText className="h-4 w-4" />
+                              Review Submitted Work
+                            </Button>
+                            {!isWorkApproved && (
+                              <Button 
+                                variant="glass" 
+                                size="lg" 
+                                className="w-full gap-2 text-green-500 hover:text-green-400"
+                                onClick={handleAcceptWork}
+                              >
+                                <ThumbsUp className="h-4 w-4" />
+                                Accept Work & Release Payment
+                              </Button>
+                            )}
+                            {isWorkApproved && (
+                              <Badge className="w-full justify-center bg-green-500/20 text-green-500 border-green-500/30">
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Work Accepted
+                              </Badge>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-center p-4 border border-dashed border-glass-border rounded-lg">
+                            <Clock className="h-8 w-8 text-foreground-muted mx-auto mb-2" />
+                            <p className="text-foreground-muted text-sm">
+                              Waiting for freelancer to submit work
+                            </p>
+                          </div>
+                        )}
+                        <Button 
+                          variant="glass" 
+                          size="lg" 
+                          className="w-full gap-2 text-red-500 hover:text-red-400"
+                          onClick={handleDispute}
+                        >
+                          <AlertTriangle className="h-4 w-4" />
+                          Raise Dispute
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button 
+                          variant="neon" 
+                          size="lg" 
+                          className="w-full gap-2"
+                          onClick={() => navigate.push(`/manage-jobs?selected=${job.publicKey.toString()}`)}
+                        >
+                          <Users className="h-4 w-4" />
+                          View Proposals ({proposalsCount})
+                        </Button>
+                        <Button variant="glass" size="lg" className="w-full gap-2">
+                          <Edit className="h-4 w-4" />
+                          Edit Job
+                        </Button>
+                        {jobStatus === "Open" && (
+                          <Button variant="glass" size="lg" className="w-full gap-2 text-destructive hover:text-destructive">
+                            <XCircle className="h-4 w-4" />
+                            Close Job
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </>
               )}
             </motion.div>
 
-            {/* Client Info */}
+            {isJobInProgress && job.account.freelancer && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="glass-card p-6"
+              >
+                <h3 className="text-lg font-bold text-foreground mb-4">Assigned Freelancer</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="font-semibold text-foreground">{freelancerInfo.name}</p>
+                      {freelancerInfo.verified && (
+                        <Badge variant="outline" className="text-xs border-green-500/30 text-green-500">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 text-neon-gold">
+                      <Star className="h-4 w-4 fill-current" />
+                      <span className="font-semibold">{freelancerInfo.rating.toFixed(1)}</span>
+                      <span className="text-foreground-muted text-sm ml-1">rating</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-4 border-t border-glass-border">
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground-muted">Jobs Completed</span>
+                      <span className="font-semibold text-foreground">{freelancerInfo.jobsCompleted}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground-muted">Success Rate</span>
+                      <span className="font-semibold text-foreground text-green-500">{freelancerInfo.successRate}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground-muted">Active Jobs</span>
+                      <span className="font-semibold text-foreground">{freelancerInfo.activeJobs}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground-muted">Total Earnings</span>
+                      <span className="font-semibold text-foreground">{freelancerInfo.totalEarnings.toFixed(2)} SOL</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-glass-border">
+                    <p className="text-sm text-foreground-muted mb-2">Freelancer Address:</p>
+                    <code className="text-xs bg-glass-primary p-2 rounded break-all">
+                      {job.account.freelancer?.toString()}
+                    </code>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -584,7 +782,6 @@ const JobDetailPage = () => {
                   </div>
                 </div>
 
-                {/* Client Address */}
                 <div className="pt-4 border-t border-glass-border">
                   <p className="text-sm text-foreground-muted mb-2">Client Address:</p>
                   <code className="text-xs bg-glass-primary p-2 rounded break-all">
@@ -594,7 +791,6 @@ const JobDetailPage = () => {
               </div>
             </motion.div>
 
-            {/* Job Public Key */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -609,6 +805,87 @@ const JobDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {showWorkModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-foreground">Submitted Work</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowWorkModal(false)}
+                className="hover:text-neon-cyan"
+              >
+                <XCircle className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Work Description</h4>
+                <p className="text-foreground-muted bg-glass-primary p-3 rounded">
+                  {job.account.workSubmissionDescription || "No description provided"}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Work URL</h4>
+                {job.account.workSubmissionUrl ? (
+                  <Button
+                    variant="glass"
+                    className="w-full justify-between"
+                    onClick={handleViewWork}
+                  >
+                    <span className="truncate">{job.account.workSubmissionUrl}</span>
+                    <ExternalLink className="h-4 w-4 ml-2" />
+                  </Button>
+                ) : (
+                  <p className="text-foreground-muted bg-glass-primary p-3 rounded">No URL provided</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold text-foreground mb-2">Submitted</h4>
+                  <p className="text-foreground-muted">{formatWorkSubmissionDate()}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-foreground mb-2">Status</h4>
+                  <Badge className={isWorkApproved ? "bg-green-500/20 text-green-500" : "bg-yellow-500/20 text-yellow-500"}>
+                    {isWorkApproved ? "Approved" : "Pending Review"}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                {!isWorkApproved && (
+                  <Button
+                    variant="neon"
+                    className="flex-1 gap-2"
+                    onClick={handleAcceptWork}
+                  >
+                    <ThumbsUp className="h-4 w-4" />
+                    Accept Work
+                  </Button>
+                )}
+                <Button
+                  variant="glass"
+                  className="flex-1 gap-2 text-red-500 hover:text-red-400"
+                  onClick={handleDispute}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Raise Dispute
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

@@ -10,12 +10,11 @@ import {
   Eye,
   AlertCircle
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Badge } from "../(module)/ui/badge";
 import { Button } from "../(module)/ui/button";
 
 const ProposalManagementPage = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useRouter();
   const userRole = "freelancer";
 
