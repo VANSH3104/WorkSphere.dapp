@@ -409,9 +409,7 @@ const ProposalManagementPage = () => {
     skills: user.resume?.skills || []
   } : null;
 
-  const handleStartWork = (jobPublicKey: string) => {
-    navigate.push(`/jobs/${jobPublicKey}?role=freelancer`);
-  };
+  
 
   const handleViewJob = (jobPublicKey: string) => {
     navigate.push(`/jobs/${jobPublicKey}?role=freelancer`);
@@ -763,10 +761,10 @@ const ProposalManagementPage = () => {
                     <Button 
                       variant="neon" 
                       className="gap-2"
-                      onClick={() => handleStartWork(proposal.id)}
+                      onClick={() => handleSubmitWork(proposal.id)}
                     >
                       <Briefcase className="h-4 w-4" />
-                      Start Work
+                      Submit work
                     </Button>
                   )}
 
@@ -775,7 +773,7 @@ const ProposalManagementPage = () => {
                       <Button 
                         variant="neon" 
                         className="gap-2"
-                        onClick={() => handleStartWork(proposal.id)}
+                        onClick={() => handleSubmitWork(proposal.id)}
                       >
                         <Briefcase className="h-4 w-4" />
                         Continue Work
