@@ -70,4 +70,10 @@ pub enum ErrorCode {
     AlreadyWithdrawn,
     #[msg("Payment has not been completed yet")]
     PaymentNotCompleted,
+    #[msg("voting period is invalid")]
+    InvalidVotingPeriod,
+    #[msg("dispute is already exist")]
+    DisputeAlreadyExists,
+    #[msg("No freelancer assign")]
+    NoFreelancerAssigned,
 }

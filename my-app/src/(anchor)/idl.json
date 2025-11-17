@@ -423,6 +423,85 @@
       "args": []
     },
     {
+      "name": "raise_dispute",
+      "discriminator": [
+        41,
+        243,
+        1,
+        51,
+        150,
+        95,
+        246,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "job_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raiser_user",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        },
+        {
+          "name": "voting_period",
+          "type": "i64"
+        }
+      ]
+    },
+    {
       "name": "register_user",
       "discriminator": [
         2,
@@ -1129,6 +1208,21 @@
       "code": 6033,
       "name": "PaymentNotCompleted",
       "msg": "Payment has not been completed yet"
+    },
+    {
+      "code": 6034,
+      "name": "InvalidVotingPeriod",
+      "msg": "voting period is invalid"
+    },
+    {
+      "code": 6035,
+      "name": "DisputeAlreadyExists",
+      "msg": "dispute is already exist"
+    },
+    {
+      "code": 6036,
+      "name": "NoFreelancerAssigned",
+      "msg": "No freelancer assign"
     }
   ],
   "types": [
@@ -1194,6 +1288,10 @@
             "type": "pubkey"
           },
           {
+            "name": "against",
+            "type": "pubkey"
+          },
+          {
             "name": "reason",
             "type": "string"
           },
@@ -1230,11 +1328,11 @@
             "type": "i64"
           },
           {
-            "name": "votes_for",
+            "name": "votes_for_raiser",
             "type": "u64"
           },
           {
-            "name": "votes_against",
+            "name": "votes_for_against",
             "type": "u64"
           },
           {
@@ -1242,6 +1340,36 @@
             "type": {
               "vec": "pubkey"
             }
+          },
+          {
+            "name": "raiser_role",
+            "type": {
+              "defined": {
+                "name": "DisputeRole"
+              }
+            }
+          },
+          {
+            "name": "against_role",
+            "type": {
+              "defined": {
+                "name": "DisputeRole"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeRole",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Client"
+          },
+          {
+            "name": "Freelancer"
           }
         ]
       }
@@ -1540,7 +1668,7 @@
                 }
               }
             }
-          },
+          },  
           {
             "name": "experience",
             "type": {

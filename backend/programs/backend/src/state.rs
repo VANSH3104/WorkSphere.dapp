@@ -188,6 +188,7 @@ pub struct Review {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Dispute {
     pub raiser: Pubkey,
+    pub against: Pubkey,
     pub reason: String,
     pub status: DisputeStatus,
     pub created_at: i64,
@@ -197,12 +198,15 @@ pub struct Dispute {
     // for voters
     pub voting_start: i64,
     pub voting_end: i64,
-    pub votes_for: u64,
-    pub votes_against: u64,
+    pub votes_for_raiser: u64,
+    pub votes_for_against: u64,
     pub voters: Vec<Pubkey>,
+    pub raiser_role: DisputeRole,
+    pub against_role: DisputeRole,
 }
 impl Dispute {
-    pub const LEN: usize = 32 + // raiser
+    pub const LEN: usize = 32 + 
+        32 +
         4 + 500 + // reason
         1 + // status
         8 + // created_at
@@ -212,7 +216,9 @@ impl Dispute {
         8 + // voting_end
         8 + // votes_for
         8 + // votes_against
-        4 + (100 * 32); // voters vec (max 100 voters)
+        4 + (100 * 32)+ // voters vec (max 100 voters)
+        1 + //raiser role
+        1;  //against role
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
@@ -220,6 +226,11 @@ pub enum DisputeStatus {
     Open,
     Resolved,
     Rejected,
+}
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum DisputeRole {
+    Client,
+    Freelancer,
 }
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum JobStatus {

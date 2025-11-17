@@ -94,7 +94,7 @@ const JobProposalPage = () => {
         });
   
         setTimeout(() => {
-          navigate.push(`/jobs/${jobId}`);
+          navigate.push(`/jobs/${jobId}?role=freelancer`);
         }, 1500);
   
       }  catch (error: any) {

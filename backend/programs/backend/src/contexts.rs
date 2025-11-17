@@ -258,3 +258,26 @@ pub struct DeleteJob<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 }
+ #[derive(Accounts)]
+ #[instruction(job_id: u64)]
+ pub struct RaiseDispute<'info> {
+    #[account(
+            mut,
+            seeds = [b"job", job_id.to_le_bytes().as_ref()],
+            bump,
+        )]
+    pub job: Account<'info, Job>,
+    
+    #[account(
+        mut,
+        seeds = [b"user", authority.key().as_ref()],
+        bump,
+        constraint = raiser_user.authority == authority.key()
+    )]
+    pub raiser_user: Account<'info, User>,
+    
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+ }

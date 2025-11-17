@@ -285,8 +285,14 @@ const ProposalManagementPage = () => {
 
           let status: Proposal["status"] = "pending";
           
+          // Check if job has a dispute first (highest priority)
+          const hasDispute = job.account.dispute !== null && 
+                            job.account.dispute !== undefined;
+          
           // PERFECTED STATUS DETERMINATION
-          if (isAssigned) {
+          if (hasDispute) {
+            status = "disputed";
+          } else if (isAssigned) {
             // Freelancer is hired/assigned
             if (hasRevisionRequest) {
               status = "revisionRequested";

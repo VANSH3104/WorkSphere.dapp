@@ -12,7 +12,6 @@ declare_id!("TCmSPaJcRMbtzJbkGcGrJtcsjzNRpAwFRNxhqTC9BZZ");
 
 #[program]
 pub mod backend {
-
     use super::*;
 
     pub fn register_user(
@@ -580,6 +579,88 @@ pub mod backend {
             job.job_id
         );
         
+        Ok(())
+    }
+    pub fn raise_dispute(
+        ctx: Context<RaiseDispute>,
+        _job_id: u64,
+        reason: String,
+        voting_period: i64,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let clock = Clock::get()?;
+        let now = clock.unix_timestamp;
+        let raiser = ctx.accounts.authority.key();
+    
+        // Validations
+        require!(
+            job.status == JobStatus::InProgress,
+            ErrorCode::JobNotInProgress
+        );
+        require!(
+            job.client == raiser || job.freelancer == Some(raiser),
+            ErrorCode::UnauthorizedUser
+        );
+        require!(
+            reason.len() <= 500,
+            ErrorCode::DescriptionTooLong
+        );
+        require!(
+            voting_period > 0 && voting_period <= 7 * 24 * 60 * 60, // max 7 days
+            ErrorCode::InvalidVotingPeriod
+        );
+        require!(
+            job.dispute.is_none(),
+            ErrorCode::DisputeAlreadyExists
+        );
+    
+        // Determine roles
+        let (raiser_role, against, against_role) = if job.client == raiser {
+            // Client is raising dispute against freelancer
+            (
+                DisputeRole::Client,
+                job.freelancer.ok_or(ErrorCode::NoFreelancerAssigned)?,
+                DisputeRole::Freelancer
+            )
+        } else {
+            (
+                DisputeRole::Freelancer,
+                job.client,
+                DisputeRole::Client
+            )
+        };
+    
+        let dispute = Dispute {
+            raiser,
+            against,
+            reason,
+            status: DisputeStatus::Open,
+            created_at: now,
+            resolved_at: None,
+            resolution: None,
+            voting_start: now,
+            voting_end: now + voting_period,
+            votes_for_raiser: 0,
+            votes_for_against: 0,
+            voters: Vec::new(),
+            raiser_role,
+            against_role,
+        };
+    
+        job.dispute = Some(dispute);
+        job.status = JobStatus::Disputed;
+        job.updated_at = now;
+        let raiser_user = &mut ctx.accounts.raiser_user;
+        raiser_user.disputes_raised = raiser_user.disputes_raised.checked_add(1).unwrap();
+    
+        msg!(
+            "Dispute raised for job '{}'. {} (raiser) vs {} (against). Voting ends at: {}",
+            job.title,
+            raiser,
+            against,
+            now + voting_period
+        );
+    
         Ok(())
     }
 

@@ -516,7 +516,9 @@ const JobDetailPage = () => {
       </div>
     );
   }
-
+  const isAssignedFreelancer = job?.account.freelancer && publicKey 
+    ? job.account.freelancer.equals(publicKey)
+    : false;
   const jobStatus = formatJobStatus(job.account.status);
   const postedDate = formatRelativeTime(job.account.createdAt);
   const deadline = formatDeadline(job.account.deadline);
@@ -747,22 +749,84 @@ const JobDetailPage = () => {
             >
               {userRole === "freelancer" ? (
                 <>
-                  <h3 className="text-xl font-bold text-foreground mb-4">Ready to Apply?</h3>
-                  {jobStatus === "Open" && (
-                    <Button
-                      variant="neon"
-                      size="lg"
-                      className="w-full mb-3"
-                      onClick={() => navigate.push(`/jobs/${jobId}/apply`)}
-                    >
-                      Submit Proposal
-                    </Button>
+                  <h3 className="text-xl font-bold text-foreground mb-4">Job Actions</h3>
+                  
+                  {jobStatus === "Open" ? (
+                    // Job is open - any freelancer can apply
+                    <>
+                      <Button
+                        variant="neon"
+                        size="lg"
+                        className="w-full mb-3"
+                        onClick={() => navigate.push(`/jobs/${jobId}/apply`)}
+                      >
+                        Submit Proposal
+                      </Button>
+                      <p className="text-sm text-foreground-muted text-center text-green-500">
+                        Accepting proposals from all freelancers
+                      </p>
+                    </>
+                  ) : jobStatus === "InProgress" && isAssignedFreelancer ? (
+                    // Job in progress and this freelancer is assigned - can submit work or raise dispute
+                    <>
+                      <Button
+                        variant="default"
+                        size="lg"
+                        className="w-full mb-3"
+                        onClick={() => navigate.push(`/submit-work/${jobId}`)}
+                      >
+                        Submit Work
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="lg"
+                        className="w-full mb-3"
+                        onClick={() => navigate.push(`/dispute-create/${jobId}/?role=${userRole}`)}
+                      >
+                        Raise Dispute
+                      </Button>
+                      <p className="text-sm text-foreground-muted text-center text-yellow-500">
+                        You are assigned to this job
+                      </p>
+                    </>
+                  ) : jobStatus === "Disputed" && isAssignedFreelancer ? (
+                    // Job is disputed and this freelancer is involved - can vote or view dispute
+                    <>
+                      <Button
+                        variant="destructive"
+                        size="lg"
+                        className="w-full mb-3"
+                        onClick={() => navigate.push(`/dispute/${jobId}`)}
+                      >
+                        View Dispute
+                      </Button>
+                      <p className="text-sm text-foreground-muted text-center text-orange-500">
+                        This job has an active dispute
+                      </p>
+                    </>
+                  ) : (
+                    // Job is not available for this freelancer
+                    <>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="w-full mb-3"
+                        disabled
+                      >
+                        {jobStatus === "InProgress" ? "Job In Progress" : "Job Not Available"}
+                      </Button>
+                      <p className="text-sm text-foreground-muted text-center text-red-500">
+                        {jobStatus === "InProgress" 
+                          ? "Already assigned to another freelancer" 
+                          : jobStatus === "Completed" 
+                          ? "Job completed" 
+                          : "Not accepting proposals"}
+                      </p>
+                    </>
                   )}
-                  <p className="text-sm text-foreground-muted text-center text-red-500">
-                    {jobStatus === "Open" ? "Accepting proposals" : "Not accepting proposals already assigned"}
-                  </p>
                 </>
               ) : (
+                // Client section - ONLY ONE CLIENT SECTION
                 <>
                   <h3 className="text-xl font-bold text-foreground mb-4">Manage Job</h3>
                   <div className="space-y-3">
@@ -832,14 +896,23 @@ const JobDetailPage = () => {
                           <Users className="h-4 w-4" />
                           View Proposals ({proposalsCount})
                         </Button>
-                        <Button variant="glass" size="lg" className="w-full gap-2">
-                          <Edit className="h-4 w-4" />
-                          Edit Job
-                        </Button>
                         {jobStatus === "Open" && (
                           <Button variant="glass" size="lg" className="w-full gap-2 text-destructive hover:text-destructive">
                             <XCircle className="h-4 w-4" />
                             Close Job
+                          </Button>
+                        )}
+                        {jobStatus === "Disputed" ? (
+                          <Button variant="glass" size="lg" className="w-full gap-2 text-destructive hover:text-destructive"
+                            onClick={() => navigate.push(`/disputes/${job.publicKey.toString()}`)}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            View Dispute
+                          </Button>
+                        ): (
+                          <Button variant="glass" size="lg" className="w-full gap-2">
+                            <Edit className="h-4 w-4" />
+                            Edit Job
                           </Button>
                         )}
                       </>
