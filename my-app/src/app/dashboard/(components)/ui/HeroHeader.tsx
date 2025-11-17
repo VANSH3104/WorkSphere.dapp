@@ -27,6 +27,7 @@ export const HeroHeader = ({
   const [isConnected, setIsConnected] = useState(true);
   const { disconnect } = useWallet();
   const router = useRouter()
+  const totalEarning = totalEarnings / 1000000000;
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
@@ -139,13 +140,10 @@ export const HeroHeader = ({
           transition={{ delay: 0.4, duration: 0.6 }}
         >
           <div className="glass-card p-4 text-center hover-lift">
-            <div className="text-2xl font-bold text-neon-gold">{totalEarnings} SOL</div>
+            <div className="text-2xl font-bold text-neon-gold">{totalEarning} SOL</div>
             <div className="text-sm text-foreground-muted">Total Earnings</div>
           </div>
-          <div className="glass-card p-4 text-center hover-lift">
-            <div className="text-2xl font-bold text-neon-cyan">4.9★</div>
-            <div className="text-sm text-foreground-muted">Reputation</div>
-          </div>
+          
         </motion.div>
 
         {/* Wallet Section */}

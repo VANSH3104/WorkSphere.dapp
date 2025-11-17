@@ -17,6 +17,7 @@ import { Inter } from "next/font/google";
 import { SolanaWalletProvider } from "@/(providers)/WalletProvider";
 import { WalletProtected } from "./routeguard";
 import { UserProvider } from "@/(providers)/userProvider";
+import { Toaster } from "sonner";
 
 
 const inter = Inter({
@@ -44,6 +45,7 @@ export default function RootLayout({
         <WalletProtected>
           <UserProvider>
         {children}
+        <Toaster position="top-right" richColors />
         </UserProvider>
        </WalletProtected>
         </SolanaWalletProvider>

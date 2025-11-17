@@ -11,7 +11,6 @@ import {
   Info,
   ArrowRight,
 } from "lucide-react";
-import * as anchor from "@coral-xyz/anchor";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -23,20 +22,19 @@ import { Button } from "@/app/(module)/ui/button";
 import { Badge } from "@/app/(module)/ui/badge";
 import { getProgram } from "@/(anchor)/setup";
 
+
 const RaiseDisputePage = () => {
   const navigate = useRouter();
-  const params = useParams(); // Fixed: use useParams() correctly
+  const{ search} = useParams();
   const { wallet, publicKey } = useWallet();
+  const jobId = search;
   const searchParams = useSearchParams();
-  
-  // Fixed: Get jobId from params correctly
-  const jobId = params.jobId as string;
   const userRole = searchParams.get("role") || "client";
-  
-  console.log("Job ID:", jobId, "User Role:", userRole);
+  console.log(userRole)
 
+  
   const [reason, setReason] = useState("");
-  const [votingPeriod, setVotingPeriod] = useState(5); // Default 5 days
+  const [votingPeriod, setVotingPeriod] = useState(5); // Default 3 days
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const maxReasonChars = 1200;
@@ -44,58 +42,45 @@ const RaiseDisputePage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("handleSubmit started");
-    
+    console.log("handleSubmit")
     if (!wallet?.adapter?.publicKey || !publicKey) {
       toast.error("Wallet not connected");
       return;
     }
-    console.log("Wallet connected");
-  
+    console.log("handleSubmit1")
     if (!jobId) {
       toast.error("Job ID not found");
       return;
     }
-    console.log("Job ID found:", jobId);
-  
+    console.log("handleSubmit2")
     if (reason.trim().length < 50) {
       toast.error("Dispute reason must be at least 50 characters");
       return;
     }
-    console.log("Reason length valid");
-  
+    console.log("handleSubmit3`")
     if (reason.trim().length > maxReasonChars) {
       toast.error(`Dispute reason must be less than ${maxReasonChars} characters`);
       return;
     }
-    console.log("All validations passed");
-  
+
     try {
       setIsSubmitting(true);
-      console.log("Starting dispute submission...");
       
       const jobAccount = new PublicKey(jobId);
       const program = getProgram(wallet.adapter);
-      console.log("Fetching job data...");
       const jobData = await program.account.job.fetch(jobAccount);
-      const numericJobId = jobData.jobId.toNumber();
-      console.log("Numeric Job ID:", numericJobId);
+      const numericJobId = jobData.jobId;
+      // Convert voting period from days to seconds
       const votingPeriodSeconds = votingPeriod * 60;
-      console.log("Voting period seconds:", votingPeriodSeconds);
       
-      console.log("Sending transaction...");
       const tx = await program.methods
-        .raiseDispute(
-          new anchor.BN(numericJobId),
-          reason, 
-          new anchor.BN(votingPeriodSeconds)
-        )
+        .raiseDispute(numericJobId, reason, votingPeriodSeconds)
         .accounts({
           job: jobAccount,
           authority: publicKey,
         })
         .rpc();
-  
+
       console.log("Dispute raised successfully:", tx);
       
       toast.success("Dispute raised successfully! The community will now vote on the resolution.");
@@ -110,8 +95,6 @@ const RaiseDisputePage = () => {
         toast.error("Can only raise disputes for jobs in progress");
       } else if (error.message?.includes("UnauthorizedUser")) {
         toast.error("Only the client or assigned freelancer can raise a dispute");
-      } else if (error.message?.includes("InvalidVotingPeriod")) {
-        toast.error("Invalid voting period specified");
       } else {
         toast.error("Failed to raise dispute. Please try again.");
       }
@@ -283,6 +266,7 @@ const RaiseDisputePage = () => {
                       <div className="group-hover:rotate-1 transition-transform">
                         Raise Dispute
                       </div>
+  
                       <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     </>
                   )}

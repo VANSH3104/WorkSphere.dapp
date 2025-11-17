@@ -280,4 +280,53 @@ pub struct DeleteJob<'info> {
     pub authority: Signer<'info>,
     
     pub system_program: Program<'info, System>,
+    
+ }
+ #[derive(Accounts)]
+ #[instruction(job_id: u64)]
+ pub struct VoteDispute<'info> {
+     #[account(
+         mut,
+         seeds = [b"job", job_id.to_le_bytes().as_ref()],
+         bump,
+     )]
+     pub job: Account<'info, Job>,
+ 
+     /// The voter's user account PDA (must correspond to voter)
+     #[account(mut)]
+     pub voter_user: Account<'info, User>,
+ 
+     #[account(mut)]
+     pub voter: Signer<'info>,
+ }
+ #[derive(Accounts)]
+ pub struct FinalizeDispute<'info> {
+     #[account(mut)]
+     pub job: Account<'info, Job>,
+ 
+     /// CHECK: Escrow PDA, validated by seeds
+     #[account(
+         mut,
+         seeds = [b"escrow", job.key().as_ref()],
+         bump
+     )]
+     pub escrow: AccountInfo<'info>,
+ 
+     /// Raiser (creator) wallet
+     /// CHECK: only need lamport transfer dest
+     #[account(mut)]
+     pub raiser: AccountInfo<'info>,
+ 
+     /// Against (freelancer) wallet
+     /// CHECK: only need lamport transfer dest
+     #[account(mut)]
+     pub against: AccountInfo<'info>,
+ 
+     #[account(mut)]
+     pub raiser_user: Account<'info, User>,
+ 
+     #[account(mut)]
+     pub against_user: Account<'info, User>,
+ 
+     pub system_program: Program<'info, System>,
  }

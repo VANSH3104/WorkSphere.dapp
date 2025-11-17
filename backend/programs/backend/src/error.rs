@@ -76,4 +76,26 @@ pub enum ErrorCode {
     DisputeAlreadyExists,
     #[msg("No freelancer assign")]
     NoFreelancerAssigned,
+    #[msg("No dispute exists for this job")]
+    NoDispute,
+    #[msg("Dispute isn't open")]
+    DisputeNotOpen,
+    #[msg("Voting is closed")]
+    VotingClosed,
+    #[msg("You have already voted on this dispute")]
+    AlreadyVoted,
+    #[msg("Voting period still active")]
+    VotingStillActive,
+    #[msg("Invalid escrow PDA bump or escrow account")]
+    InvalidBump,
+    #[msg("Invalid raiser or against user account supplied")]
+    InvalidRaiserUserAccount,
+    #[msg("Invalid raiser account provided")]
+    InvalidRaiserAccount,
+    #[msg("Invalid against account provided")]
+    InvalidAgainstAccount,
+    #[msg("Cannot vote on your own dispute")]
+    CannotVoteOwnDispute,
+    #[msg("Maximum number of voters reached")]
+    MaxVotersReached,
 }

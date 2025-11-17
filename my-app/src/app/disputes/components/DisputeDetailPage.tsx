@@ -48,6 +48,7 @@ interface Dispute {
   votesForFreelancer: number;
   totalVotes: number;
   jobPublicKey: PublicKey;
+  disputeData?: any;
 }
 
 export const DisputeOverviewPage = () => {
@@ -81,7 +82,7 @@ export const DisputeOverviewPage = () => {
         setLoading(false);
         return;
       }
-
+    
       try {
         setLoading(true);
         
@@ -89,50 +90,59 @@ export const DisputeOverviewPage = () => {
         const disputedJobs = await fetchJobs(wallet.adapter, { 
           statusFilter: 'disputed' 
         });
-
-        // Transform job data into dispute format
-        const disputeData: Dispute[] = disputedJobs.map((job, index) => {
-          const jobStatus = job.account.status?.disputed ? 'open' : 'open';
-          const budgetSOL = bnToNumber(job.account.budget) / 1000000000;
-          
-          const disputeReasons = [
-            "Freelancer claims incomplete payment for milestone completion despite delivering all required features as per agreement.",
-            "Client disputes the quality of deliverables submitted, claiming they don't meet the specifications outlined in the initial proposal.",
-            "Disagreement on project scope and final deliverables. Both parties have different interpretations of the completion criteria.",
-            "Client claims work was not delivered on time according to the agreed deadline, affecting their business operations.",
-            "Payment release delayed, freelancer initiated dispute after multiple attempts to resolve amicably failed."
-          ];
-
-          const disputeStatuses: Array<"open" | "voting" | "resolved" | "rejected"> = 
-            ["open", "voting", "resolved", "rejected"];
-          
-          const status = disputeStatuses[index % disputeStatuses.length];
-          const votesForClient = Math.floor(Math.random() * 20);
-          const votesForFreelancer = Math.floor(Math.random() * 20);
-          const totalVotes = votesForClient + votesForFreelancer;
-
-          return {
-            id: job.publicKey.toString(),
-            jobId: `job-${index + 1}`,
-            jobTitle: job.account.title,
-            reason: disputeReasons[index % disputeReasons.length],
-            status,
-            createdDate: new Date(bnToNumber(job.account.createdAt) * 1000).toISOString().split('T')[0],
-            amount: budgetSOL,
-            client: job.account.client.toString().slice(0, 8) + '...' + job.account.client.toString().slice(-8),
-            freelancer: job.account.freelancer 
-              ? job.account.freelancer.toString().slice(0, 8) + '...' + job.account.freelancer.toString().slice(-8)
-              : "Not assigned",
-            votesForClient,
-            votesForFreelancer,
-            totalVotes,
-            jobPublicKey: job.publicKey
-          };
-        });
-
+    
+        // Transform job data into dispute format using REAL dispute data
+        const disputeData: Dispute[] = disputedJobs
+          .filter(job => job.account.dispute) // Only jobs with actual disputes
+          .map((job) => {
+            const dispute = job.account.dispute;
+            if (!dispute) return null;
+    
+            const budgetSOL = bnToNumber(job.account.budget) / 1000000000;
+            
+            // Use REAL dispute data from blockchain
+            const votesForRaiser = bnToNumber(dispute.votesForRaiser);
+            const votesForAgainst = bnToNumber(dispute.votesForAgainst);
+            const totalVotes = votesForRaiser + votesForAgainst;
+            
+            // Determine actual dispute status from blockchain
+            let status: "open" | "voting" | "resolved" | "rejected" = "open";
+            if (dispute.status?.open) status = "open";
+            else if (dispute.status?.resolved) status = "resolved";
+            // Add more status checks as needed
+            
+            // Check if voting period has ended
+            const votingEnd = bnToNumber(dispute.votingEnd);
+            const currentTime = Math.floor(Date.now() / 1000);
+            if (status === "open" && currentTime >= votingEnd) {
+              status = "voting"; // Or create a "pending_finalization" status
+            }
+    
+            return {
+              id: job.publicKey.toString(),
+              jobId: `job-${bnToNumber(job.account.jobId)}`,
+              jobTitle: job.account.title,
+              reason: dispute.reason || "No reason provided",
+              status,
+              createdDate: new Date(bnToNumber(dispute.createdAt) * 1000).toISOString().split('T')[0],
+              amount: budgetSOL,
+              client: job.account.client.toString().slice(0, 8) + '...' + job.account.client.toString().slice(-8),
+              freelancer: job.account.freelancer 
+                ? job.account.freelancer.toString().slice(0, 8) + '...' + job.account.freelancer.toString().slice(-8)
+                : "Not assigned",
+              votesForClient: dispute.raiserRole?.client ? votesForAgainst : votesForRaiser,
+              votesForFreelancer: dispute.raiserRole?.freelancer ? votesForRaiser : votesForAgainst,
+              totalVotes,
+              jobPublicKey: job.publicKey,
+              // Add real dispute data for access
+              disputeData: dispute
+            };
+          })
+          .filter(Boolean) as Dispute[]; // Remove null entries
+    
         setDisputes(disputeData);
-
-        // Calculate stats
+    
+        // Calculate stats from REAL data
         const statsData = {
           total: disputeData.length,
           open: disputeData.filter(d => d.status === 'open').length,
@@ -142,7 +152,7 @@ export const DisputeOverviewPage = () => {
           totalAmount: disputeData.reduce((sum, dispute) => sum + dispute.amount, 0)
         };
         setStats(statsData);
-
+    
       } catch (error) {
         console.error("Failed to load disputes:", error);
         setDisputes([]);

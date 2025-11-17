@@ -661,7 +661,301 @@ pub mod backend {
             now + voting_period
         );
     
+        Ok(())  
+    }
+    // ============================================================================
+    // CORRECTED VOTE_DISPUTE FUNCTION
+    // ============================================================================
+    pub fn vote_dispute(
+        ctx: Context<VoteDispute>,
+        _job_id: u64,
+        vote_for_raiser: bool,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let voter_user = &mut ctx.accounts.voter_user;
+        let voter = ctx.accounts.voter.key();
+        let clock = Clock::get()?;
+        let now = clock.unix_timestamp;
+    
+        // Ensure dispute exists and is open
+        let dispute = job.dispute.as_mut().ok_or(ErrorCode::NoDispute)?;
+        require!(dispute.status == DisputeStatus::Open, ErrorCode::DisputeNotOpen);
+    
+        // Ensure voting window is active
+        require!(
+            now >= dispute.voting_start && now <= dispute.voting_end, 
+            ErrorCode::VotingClosed
+        );
+    
+        // FIX 1: Verify voter is not involved in the dispute
+        require!(
+            voter != dispute.raiser && voter != dispute.against,
+            ErrorCode::CannotVoteOwnDispute
+        );
+    
+        // Ensure voter hasn't voted before
+        require!(
+            !dispute.voters.iter().any(|v| v == &voter),
+            ErrorCode::AlreadyVoted
+        );
+    
+        // FIX 2: Add a check to ensure the voters vector doesn't grow too large
+        require!(
+            dispute.voters.len() < 100,
+            ErrorCode::MaxVotersReached
+        );
+    
+        // Record vote
+        if vote_for_raiser {
+            dispute.votes_for_raiser = dispute.votes_for_raiser.checked_add(1).unwrap();
+        } else {
+            dispute.votes_for_against = dispute.votes_for_against.checked_add(1).unwrap();
+        }
+        dispute.voters.push(voter);
+    
+        // Give voter +3 reputation
+        voter_user.reputation = voter_user.reputation.checked_add(3).unwrap();
+    
+        msg!(
+            "Voter {} voted for {} on dispute for job {}",
+            voter,
+            if vote_for_raiser { "raiser" } else { "against" },
+            job.job_id
+        );
+    
         Ok(())
     }
-
+    
+    // ============================================================================
+    // CORRECTED FINALIZE_DISPUTE FUNCTION
+    // ============================================================================
+        pub fn finalize_dispute(
+        ctx: Context<FinalizeDispute>,
+        _job_id: u64,
+    ) -> Result<()> {
+        let job = &mut ctx.accounts.job;
+        let clock = Clock::get()?;
+        let now = clock.unix_timestamp;
+    
+        // FIX 1: Validate dispute exists and is in correct state
+        let dispute = job.dispute.as_ref().ok_or(ErrorCode::NoDispute)?;
+        require!(dispute.status == DisputeStatus::Open, ErrorCode::DisputeNotOpen);
+        require!(now >= dispute.voting_end, ErrorCode::VotingStillActive);
+    
+        // FIX 2: Verify the correct accounts are passed
+        require!(
+            ctx.accounts.raiser.key() == dispute.raiser,
+            ErrorCode::InvalidRaiserAccount
+        );
+        require!(
+            ctx.accounts.against.key() == dispute.against,
+            ErrorCode::InvalidAgainstAccount
+        );
+    
+        let escrow_lamports = ctx.accounts.escrow.lamports();
+        let votes_for = dispute.votes_for_raiser;
+        let votes_against = dispute.votes_for_against;
+    
+        let job_key = job.key();
+        let bump = ctx.bumps.escrow;
+        let escrow_seeds: &[&[u8]] = &[
+            b"escrow",
+            job_key.as_ref(),
+            &[bump],
+        ];
+        let signer = &[escrow_seeds];
+    
+        // FIX 3: Handle the case where there are no votes
+        if votes_for == 0 && votes_against == 0 {
+            // No votes cast - treat as a tie
+            let half = escrow_lamports / 2;
+            let rem = escrow_lamports - half;
+    
+            if half > 0 {
+                let ix1 = system_instruction::transfer(
+                    &ctx.accounts.escrow.key(),
+                    &dispute.raiser,
+                    half,
+                );
+                anchor_lang::solana_program::program::invoke_signed(
+                    &ix1,
+                    &[
+                        ctx.accounts.escrow.to_account_info(),
+                        ctx.accounts.raiser.to_account_info(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    signer,
+                )?;
+            }
+    
+            if rem > 0 {
+                let ix2 = system_instruction::transfer(
+                    &ctx.accounts.escrow.key(),
+                    &dispute.against,
+                    rem,
+                );
+                anchor_lang::solana_program::program::invoke_signed(
+                    &ix2,
+                    &[
+                        ctx.accounts.escrow.to_account_info(),
+                        ctx.accounts.against.to_account_info(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    signer,
+                )?;
+            }
+    
+            ctx.accounts.raiser_user.reputation = ctx.accounts.raiser_user.reputation.checked_add(5).unwrap();
+            ctx.accounts.against_user.reputation = ctx.accounts.against_user.reputation.checked_add(5).unwrap();
+            ctx.accounts.raiser_user.total_earnings = ctx.accounts.raiser_user.total_earnings.checked_add(half).unwrap();
+            ctx.accounts.against_user.total_earnings = ctx.accounts.against_user.total_earnings.checked_add(rem).unwrap();
+    
+            job.total_paid = escrow_lamports;
+        } else if votes_for > votes_against {
+            // Raiser wins
+            if escrow_lamports > 0 {
+                let ix = system_instruction::transfer(
+                    &ctx.accounts.escrow.key(),
+                    &dispute.raiser,
+                    escrow_lamports,
+                );
+                anchor_lang::solana_program::program::invoke_signed(
+                    &ix,
+                    &[
+                        ctx.accounts.escrow.to_account_info(),
+                        ctx.accounts.raiser.to_account_info(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    signer,
+                )?;
+            }
+    
+            // FIX 4: Use checked arithmetic for reputation changes
+            ctx.accounts.raiser_user.reputation = ctx.accounts.raiser_user.reputation.checked_add(20).unwrap();
+            ctx.accounts.against_user.reputation = ctx.accounts.against_user.reputation.saturating_sub(20); // Use saturating_sub to prevent underflow
+            ctx.accounts.raiser_user.completed_jobs = ctx.accounts.raiser_user.completed_jobs.checked_add(1).unwrap();
+            ctx.accounts.raiser_user.total_earnings = ctx.accounts.raiser_user.total_earnings.checked_add(escrow_lamports).unwrap();
+    
+            // FIX 5: Update pending jobs counter based on role
+            if dispute.raiser_role == DisputeRole::Freelancer {
+                ctx.accounts.raiser_user.pending_jobs = ctx.accounts.raiser_user.pending_jobs.saturating_sub(1);
+            }
+            if dispute.against_role == DisputeRole::Freelancer {
+                ctx.accounts.against_user.pending_jobs = ctx.accounts.against_user.pending_jobs.saturating_sub(1);
+            }
+    
+            job.total_paid = escrow_lamports;
+        } else if votes_for < votes_against {
+            // Against wins
+            if escrow_lamports > 0 {
+                let ix = system_instruction::transfer(
+                    &ctx.accounts.escrow.key(),
+                    &dispute.against,
+                    escrow_lamports,
+                );
+                anchor_lang::solana_program::program::invoke_signed(
+                    &ix,
+                    &[
+                        ctx.accounts.escrow.to_account_info(),
+                        ctx.accounts.against.to_account_info(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    signer,
+                )?;
+            }
+    
+            ctx.accounts.against_user.reputation = ctx.accounts.against_user.reputation.checked_add(20).unwrap();
+            ctx.accounts.raiser_user.reputation = ctx.accounts.raiser_user.reputation.saturating_sub(20);
+            ctx.accounts.against_user.completed_jobs = ctx.accounts.against_user.completed_jobs.checked_add(1).unwrap();
+            ctx.accounts.against_user.total_earnings = ctx.accounts.against_user.total_earnings.checked_add(escrow_lamports).unwrap();
+    
+            if dispute.raiser_role == DisputeRole::Freelancer {
+                ctx.accounts.raiser_user.pending_jobs = ctx.accounts.raiser_user.pending_jobs.saturating_sub(1);
+            }
+            if dispute.against_role == DisputeRole::Freelancer {
+                ctx.accounts.against_user.pending_jobs = ctx.accounts.against_user.pending_jobs.saturating_sub(1);
+            }
+    
+            job.total_paid = escrow_lamports;
+        } else {
+            // Tie → split escrow 50–50
+            let half = escrow_lamports / 2;
+            let rem = escrow_lamports - half;
+    
+            if half > 0 {
+                let ix1 = system_instruction::transfer(
+                    &ctx.accounts.escrow.key(),
+                    &dispute.raiser,
+                    half,
+                );
+                anchor_lang::solana_program::program::invoke_signed(
+                    &ix1,
+                    &[
+                        ctx.accounts.escrow.to_account_info(),
+                        ctx.accounts.raiser.to_account_info(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    signer,
+                )?;
+            }
+    
+            if rem > 0 {
+                let ix2 = system_instruction::transfer(
+                    &ctx.accounts.escrow.key(),
+                    &dispute.against,
+                    rem,
+                );
+                anchor_lang::solana_program::program::invoke_signed(
+                    &ix2,
+                    &[
+                        ctx.accounts.escrow.to_account_info(),
+                        ctx.accounts.against.to_account_info(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    signer,
+                )?;
+            }
+    
+            ctx.accounts.raiser_user.reputation = ctx.accounts.raiser_user.reputation.checked_add(10).unwrap();
+            ctx.accounts.against_user.reputation = ctx.accounts.against_user.reputation.checked_add(10).unwrap();
+            ctx.accounts.raiser_user.completed_jobs = ctx.accounts.raiser_user.completed_jobs.checked_add(1).unwrap();
+            ctx.accounts.against_user.completed_jobs = ctx.accounts.against_user.completed_jobs.checked_add(1).unwrap();
+            ctx.accounts.raiser_user.total_earnings = ctx.accounts.raiser_user.total_earnings.checked_add(half).unwrap();
+            ctx.accounts.against_user.total_earnings = ctx.accounts.against_user.total_earnings.checked_add(rem).unwrap();
+    
+            if dispute.raiser_role == DisputeRole::Freelancer {
+                ctx.accounts.raiser_user.pending_jobs = ctx.accounts.raiser_user.pending_jobs.saturating_sub(1);
+            }
+            if dispute.against_role == DisputeRole::Freelancer {
+                ctx.accounts.against_user.pending_jobs = ctx.accounts.against_user.pending_jobs.saturating_sub(1);
+            }
+    
+            job.total_paid = escrow_lamports;
+        }
+    
+        // Final state updates
+        let job = &mut ctx.accounts.job;
+        let mut dispute = job.dispute.take().unwrap();
+        dispute.status = DisputeStatus::Resolved;
+        dispute.resolved_at = Some(now);
+        dispute.resolution = Some(format!(
+            "Votes: {} for raiser, {} for against",
+            votes_for, votes_against
+        ));
+        
+        job.dispute = Some(dispute);
+        job.status = JobStatus::Completed;
+        job.escrow = Pubkey::default();
+        job.updated_at = now;
+    
+        msg!(
+            "Dispute finalized for job {}. Votes: {} for raiser, {} for against",
+            job.job_id,
+            votes_for,
+            votes_against
+        );
+    
+        Ok(())
+    }
+    
 }

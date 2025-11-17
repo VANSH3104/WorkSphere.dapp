@@ -61,20 +61,15 @@ export const Sidebar = ({
       badge: userRole === "client" ? "5" : "12",
       route: userRole === "client" ? `/manage-jobs?role=${userRole}` : `/jobs`
     },
-    { 
-      id: "proposals", 
-      label: "Proposals", 
-      icon: FileText,   
-      badge: "3",
-      route: `/proposals`
-    },
-    { 
-      id: "submissions", 
-      label: "Work Submissions", 
-      icon: Upload,
-      badge: null,
-      route: `/submissions`
-    },
+    ...(userRole === "freelancer" ? [
+        { 
+          id: "proposals", 
+          label: "Proposals", 
+          icon: FileText,   
+          badge: "3",
+          route: `/proposals`
+        },
+      ] : []),
     { 
       id: "disputes", 
       label: "Disputes", 
@@ -82,20 +77,6 @@ export const Sidebar = ({
       badge: "2",
       route: `/disputes`
     },
-    { 
-      id: "dao", 
-      label: "DAO Governance", 
-      icon: Users,
-      badge: "1",
-      route: `/dao`
-    },
-    { 
-      id: "nfts", 
-      label: "NFT Gallery", 
-      icon: Palette,
-      badge: null,
-      route: `/nfts`
-    }
   ];
 
   const truncateAddress = (address: string) => {
@@ -267,30 +248,7 @@ export const Sidebar = ({
           </motion.div>
         )}
 
-        {/* Theme Toggle */}
-        {!isCollapsed && (
-          <motion.div 
-            className="flex items-center justify-between p-3 glass-panel rounded-lg"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            <div className="flex items-center space-x-2">
-              {isDarkMode ? (
-                <Moon className="w-4 h-4 text-neon-purple" />
-              ) : (
-                <Sun className="w-4 h-4 text-neon-gold" />
-              )}
-              <span className="text-sm text-foreground-muted">Dark Mode</span>
-            </div>
-            <Switch
-              checked={isDarkMode}
-              onCheckedChange={setIsDarkMode}
-              className="data-[state=checked]:bg-gradient-primary"
-            />
-          </motion.div>
-        )}
-
+       
         {/* Settings Button */}
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <Button 

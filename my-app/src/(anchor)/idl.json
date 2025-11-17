@@ -374,6 +374,80 @@
       ]
     },
     {
+      "name": "finalize_dispute",
+      "discriminator": [
+        190,
+        211,
+        17,
+        122,
+        247,
+        157,
+        27,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "job"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raiser",
+          "docs": [
+            "Raiser (creator) wallet"
+          ],
+          "writable": true
+        },
+        {
+          "name": "against",
+          "docs": [
+            "Against (freelancer) wallet"
+          ],
+          "writable": true
+        },
+        {
+          "name": "raiser_user",
+          "writable": true
+        },
+        {
+          "name": "against_user",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "initialize_job_counter",
       "discriminator": [
         127,
@@ -877,6 +951,63 @@
       ]
     },
     {
+      "name": "vote_dispute",
+      "discriminator": [
+        23,
+        190,
+        211,
+        170,
+        65,
+        223,
+        4,
+        243
+      ],
+      "accounts": [
+        {
+          "name": "job",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  111,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "job_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter_user",
+          "docs": [
+            "The voter's user account PDA (must correspond to voter)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "_job_id",
+          "type": "u64"
+        },
+        {
+          "name": "vote_for_raiser",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "withdraw_from_escrow",
       "discriminator": [
         235,
@@ -1223,6 +1354,61 @@
       "code": 6036,
       "name": "NoFreelancerAssigned",
       "msg": "No freelancer assign"
+    },
+    {
+      "code": 6037,
+      "name": "NoDispute",
+      "msg": "No dispute exists for this job"
+    },
+    {
+      "code": 6038,
+      "name": "DisputeNotOpen",
+      "msg": "Dispute isn't open"
+    },
+    {
+      "code": 6039,
+      "name": "VotingClosed",
+      "msg": "Voting is closed"
+    },
+    {
+      "code": 6040,
+      "name": "AlreadyVoted",
+      "msg": "You have already voted on this dispute"
+    },
+    {
+      "code": 6041,
+      "name": "VotingStillActive",
+      "msg": "Voting period still active"
+    },
+    {
+      "code": 6042,
+      "name": "InvalidBump",
+      "msg": "Invalid escrow PDA bump or escrow account"
+    },
+    {
+      "code": 6043,
+      "name": "InvalidRaiserUserAccount",
+      "msg": "Invalid raiser or against user account supplied"
+    },
+    {
+      "code": 6044,
+      "name": "InvalidRaiserAccount",
+      "msg": "Invalid raiser account provided"
+    },
+    {
+      "code": 6045,
+      "name": "InvalidAgainstAccount",
+      "msg": "Invalid against account provided"
+    },
+    {
+      "code": 6046,
+      "name": "CannotVoteOwnDispute",
+      "msg": "Cannot vote on your own dispute"
+    },
+    {
+      "code": 6047,
+      "name": "MaxVotersReached",
+      "msg": "Maximum number of voters reached"
     }
   ],
   "types": [
@@ -1668,7 +1854,7 @@
                 }
               }
             }
-          },  
+          },
           {
             "name": "experience",
             "type": {
