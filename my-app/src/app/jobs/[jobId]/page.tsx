@@ -879,7 +879,7 @@ const JobDetailPage = () => {
                           variant="glass" 
                           size="lg" 
                           className="w-full gap-2 text-red-500 hover:text-red-400"
-                          onClick={handleDispute}
+                          onClick={() => navigate.push(`/dispute-create/${jobId}/?role=${userRole}`)}
                         >
                           <AlertTriangle className="h-4 w-4" />
                           Raise Dispute

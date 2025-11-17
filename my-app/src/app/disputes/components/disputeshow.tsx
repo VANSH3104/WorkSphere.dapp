@@ -23,7 +23,10 @@ import {
   Target,
   BookOpen,
   Zap,
-  ExternalLink
+  ExternalLink,
+  Crown,
+  Scale as ScaleIcon,
+  Gavel
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/(module)/ui/card";
 import { Button } from "@/app/(module)/ui/button";
@@ -95,13 +98,21 @@ interface DisputeDetail {
   skills: string[];
   budget: number;
   deadline: string;
-  status: "open" | "voting" | "resolved" | "rejected";
+  status: "open" | "voting" | "resolved" | "rejected" | "disputed";
   dispute: {
     raiser: PublicKey;
     against: PublicKey;
     reason: string;
     status: any;
     createdAt: number;
+    votesForRaiser: BN;
+    votesForAgainst: BN;
+    votingEnd: BN;
+    votingStart: BN;
+    resolution?: {
+      winner: PublicKey;
+      amount: BN;
+    };
   };
   client: UserProfile;
   freelancer: UserProfile;
@@ -143,6 +154,7 @@ const DisputeDetailPage = () => {
   const { fetchUserByAddress } = useUser();
   const [votingDialogOpen, setVotingDialogOpen] = useState(false);
   const [selectedVote, setSelectedVote] = useState<"client" | "freelancer" | null>(null);
+
   useEffect(() => {
     const loadDisputeData = async () => {
       if (!wallet?.adapter || !disputeId) {
@@ -166,6 +178,15 @@ const DisputeDetailPage = () => {
         console.log("Job Data:", jobData);
         console.log("Client Data:", clientData);
         console.log("Freelancer Data:", freelancerData);
+
+        // Helper function to get dispute status
+        const getDisputeStatus = (disputeStatus: any): string => {
+          if (disputeStatus?.open) return "open";
+          if (disputeStatus?.voting) return "voting";
+          if (disputeStatus?.resolved) return "resolved";
+          if (disputeStatus?.rejected) return "rejected";
+          return "open";
+        };
 
         // Transform user data to profile format
         const clientProfile: UserProfile = {
@@ -201,6 +222,11 @@ const DisputeDetailPage = () => {
           resume: freelancerData?.resume || undefined,
         };
 
+        // Calculate voting stats
+        const votesForRaiser = jobData.account.dispute.votesForRaiser.toNumber();
+        const votesForAgainst = jobData.account.dispute.votesForAgainst.toNumber();
+        const totalVotes = votesForRaiser + votesForAgainst;
+        
         const disputeData: DisputeDetail = {
           id: jobData.publicKey.toString(),
           jobId: `job-${jobData.account.jobId.toString()}`,
@@ -210,16 +236,16 @@ const DisputeDetailPage = () => {
           skills: jobData.account.skills || [],
           budget: jobData.account.budget.toNumber() / 1_000_000_000,
           deadline: new Date(jobData.account.deadline.toNumber() * 1000).toISOString(),
-          status: "voting",
+          status: getDisputeStatus(jobData.account.dispute.status),
           dispute: jobData.account.dispute,
           client: clientProfile,
           freelancer: freelancerProfile,
           createdDate: new Date(jobData.account.createdAt.toNumber() * 1000).toISOString(),
           votingStats: {
-            votesFor: Math.floor(Math.random() * 100) + 50,
-            votesAgainst: Math.floor(Math.random() * 50) + 20,
-            totalStake: Math.floor(Math.random() * 200) + 100,
-            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            votesFor: votesForRaiser,
+            votesAgainst: votesForAgainst,
+            totalStake: totalVotes,
+            endDate: new Date(jobData.account.dispute.votingEnd.toNumber() * 1000).toISOString(),
           },
           evidence: [
             {
@@ -241,7 +267,10 @@ const DisputeDetailPage = () => {
           ],
           timeline: {
             created: new Date(jobData.account.createdAt.toNumber() * 1000).toISOString(),
-            votingStarted: new Date(jobData.account.dispute?.createdAt?.toNumber() * 1000 || Date.now()).toISOString(),
+            votingStarted: new Date(jobData.account.dispute?.votingStart?.toNumber() * 1000 || Date.now()).toISOString(),
+            resolved: jobData.account.dispute?.resolvedAt 
+              ? new Date(jobData.account.dispute.resolvedAt.toNumber() * 1000).toISOString()
+              : undefined,
           },
           workSubmission: {
             submitted: jobData.account.workSubmitted || false,
@@ -289,39 +318,58 @@ const DisputeDetailPage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="glass-card p-8 flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
-            <div className="text-lg text-foreground">Loading dispute details...</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Calculate voting percentages
+  const votesForRaiser = dispute?.dispute.votesForRaiser.toNumber() || 0;
+  const votesForAgainst = dispute?.dispute.votesForAgainst.toNumber() || 0;
+  const totalVotes = votesForRaiser + votesForAgainst;
+  const votesForPercentage = totalVotes > 0 ? Math.round((votesForRaiser / totalVotes) * 100) : 0;
+  const votesAgainstPercentage = totalVotes > 0 ? Math.round((votesForAgainst / totalVotes) * 100) : 0;
 
-  if (!dispute) {
-    return (
-      <div className="min-h-screen p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="glass-card p-8">
-            <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-foreground mb-2">Dispute Not Found</h2>
-            <p className="text-foreground-muted mb-6">The dispute you're looking for doesn't exist or you don't have access to it.</p>
-            <Button variant="neon" onClick={() => navigate.push('/disputes')}>
-              Back to Disputes
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Determine winner and verdict
+  const getVerdict = () => {
+    if (!dispute) return null;
+    
+    const isResolved = dispute.dispute.status?.resolved;
+    const isRejected = dispute.dispute.status?.rejected;
+    
+    if (isResolved || isRejected) {
+      const winner = dispute.dispute.resolution?.winner;
+      if (!winner) return null;
+      
+      const isClientWinner = winner.equals(dispute.client.fullAddress);
+      const isFreelancerWinner = winner.equals(dispute.freelancer.fullAddress);
+      
+      return {
+        winner: isClientWinner ? 'client' : isFreelancerWinner ? 'freelancer' : 'unknown',
+        amount: dispute.dispute.resolution?.amount ? dispute.dispute.resolution.amount.toNumber() / 1_000_000_000 : 0,
+        isResolved,
+        isRejected
+      };
+    }
+    
+    // For ongoing disputes, show current leader
+    if (votesForRaiser > votesForAgainst) {
+      const isRaiserClient = dispute.dispute.raiser.equals(dispute.client.fullAddress);
+      return {
+        winner: isRaiserClient ? 'client' : 'freelancer',
+        amount: dispute.budget,
+        isLeading: true
+      };
+    } else if (votesForAgainst > votesForRaiser) {
+      const isAgainstClient = dispute.dispute.against.equals(dispute.client.fullAddress);
+      return {
+        winner: isAgainstClient ? 'client' : 'freelancer',
+        amount: dispute.budget,
+        isLeading: true
+      };
+    }
+    
+    return null;
+  };
 
-  const votesForPercentage = Math.round((dispute.votesFor / dispute.votingStats.totalStake) * 100);
-  const votesAgainstPercentage = Math.round((dispute.votesAgainst / dispute.votingStats.totalStake) * 100);
-  // ADD VOTING DIALOG COMPONENT HERE - BEFORE THE DisputeDetailPage RETURN
+  const verdict = getVerdict();
+
+  // Voting Dialog Component
   const VotingDialog = () => {
     const { publicKey, signTransaction, wallet } = useWallet();
     const [submitting, setSubmitting] = useState(false);
@@ -335,7 +383,6 @@ const DisputeDetailPage = () => {
         setSubmitting(true);
         const program = await getProgram(wallet.adapter);
         
-        // Get the actual job ID from the job data
         const jobPublicKey = new PublicKey(dispute.id);
         const jobData = await fetchJobByPublicKey(wallet.adapter, jobPublicKey);
         
@@ -346,14 +393,12 @@ const DisputeDetailPage = () => {
         const jobId = jobData.account.jobId.toNumber();
         console.log("Voting on job ID:", jobId);
   
-        // Determine vote_for_raiser based on selection
         const voteForRaiser = selectedVote === "client" 
           ? dispute.dispute.raiser.equals(dispute.client.fullAddress)
           : dispute.dispute.raiser.equals(dispute.freelancer.fullAddress);
   
         console.log("Vote for raiser:", voteForRaiser);
   
-        // Find PDAs
         const [jobPda] = PublicKey.findProgramAddressSync(
           [Buffer.from('job'), new BN(jobId).toArrayLike(Buffer, 'le', 8)],
           program.programId
@@ -367,7 +412,6 @@ const DisputeDetailPage = () => {
         console.log("Job PDA:", jobPda.toString());
         console.log("Voter User PDA:", voterUserPda.toString());
   
-        // Create and send transaction
         const txSignature = await program.methods
           .voteDispute(new BN(jobId), voteForRaiser)
           .accounts({
@@ -383,8 +427,6 @@ const DisputeDetailPage = () => {
         
         setVotingDialogOpen(false);
         setSelectedVote(null);
-        
-        // Refresh dispute data
         window.location.reload();
   
       } catch (error: any) {
@@ -479,13 +521,15 @@ const DisputeDetailPage = () => {
       </div>
     );
   };
-  
+
+  // Finalize Dispute Button Component
   const FinalizeDisputeButton = () => {
     const { publicKey, signTransaction, wallet } = useWallet();
     const [finalizing, setFinalizing] = useState(false);
   
     const handleFinalize = async () => {
       if (!publicKey || !signTransaction || !dispute || !wallet?.adapter) {
+        alert("Please connect your wallet to finalize the dispute");
         return;
       }
   
@@ -493,7 +537,6 @@ const DisputeDetailPage = () => {
         setFinalizing(true);
         const program = await getProgram(wallet.adapter);
         
-        // Get the actual job ID from the job data
         const jobPublicKey = new PublicKey(dispute.id);
         const jobData = await fetchJobByPublicKey(wallet.adapter, jobPublicKey);
         
@@ -504,7 +547,6 @@ const DisputeDetailPage = () => {
         const jobId = jobData.account.jobId.toNumber();
         console.log("Finalizing dispute for job ID:", jobId);
   
-        // Find PDAs
         const [jobPda] = PublicKey.findProgramAddressSync(
           [Buffer.from('job'), new BN(jobId).toArrayLike(Buffer, 'le', 8)],
           program.programId
@@ -525,14 +567,6 @@ const DisputeDetailPage = () => {
           program.programId
         );
   
-        console.log("Finalizing dispute with PDAs:", {
-          jobPda: jobPda.toString(),
-          escrowPda: escrowPda.toString(),
-          raiserUserPda: raiserUserPda.toString(),
-          againstUserPda: againstUserPda.toString()
-        });
-  
-        // Create and send transaction
         const txSignature = await program.methods
           .finalizeDispute(new BN(jobId))
           .accounts({
@@ -548,8 +582,6 @@ const DisputeDetailPage = () => {
         console.log("Finalize dispute transaction successful:", txSignature);
         
         alert(`Dispute finalized successfully! Transaction: ${txSignature}`);
-        
-        // Refresh dispute data
         window.location.reload();
   
       } catch (error: any) {
@@ -559,18 +591,16 @@ const DisputeDetailPage = () => {
         setFinalizing(false);
       }
     };
-  
-    // Check if voting period has ended
+
     const votingEndTime = dispute.dispute.votingEnd?.toNumber() || 0;
     const currentTime = Math.floor(Date.now() / 1000);
     const votingEnded = currentTime >= votingEndTime;
-    const disputeOpen = dispute.dispute.status?.open !== undefined;
-  
-    // Only show button if voting has ended and dispute is still open
-    if (!votingEnded || !disputeOpen) {
-      return null;
-    }
-  
+    const isVotingStatus = dispute.dispute.status?.voting !== undefined;
+    const isResolved = dispute.dispute.status?.resolved !== undefined;
+    const isRejected = dispute.dispute.status?.rejected !== undefined;
+
+    
+    // Show finalize button only when voting has ended and dispute is still in voting status
     return (
       <Button 
         variant="neon" 
@@ -585,7 +615,7 @@ const DisputeDetailPage = () => {
           </div>
         ) : (
           <>
-            <CheckCircle2 className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
+            <Gavel className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
             Finalize Dispute
             <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
           </>
@@ -593,6 +623,37 @@ const DisputeDetailPage = () => {
       </Button>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="glass-card p-8 flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-cyan"></div>
+            <div className="text-lg text-foreground">Loading dispute details...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dispute) {
+    return (
+      <div className="min-h-screen p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="glass-card p-8">
+            <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-foreground mb-2">Dispute Not Found</h2>
+            <p className="text-foreground-muted mb-6">The dispute you're looking for doesn't exist or you don't have access to it.</p>
+            <Button variant="neon" onClick={() => navigate.push('/disputes')}>
+              Back to Disputes
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-6 lg:p-8">
       {/* Background Effects */}
@@ -615,7 +676,7 @@ const DisputeDetailPage = () => {
         </motion.div>
 
         {/* Header Section */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 ">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <Card className="glass-card overflow-hidden">
             <CardHeader className="space-y-4">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -637,7 +698,6 @@ const DisputeDetailPage = () => {
                   <CardDescription className="text-base items-center gap-2 grid text-foreground-muted">
                     <Scale className="h-4 w-4" />
                     Dispute ID: {dispute.id.slice(0, 8)}...{dispute.id.slice(-8)}
-                    
                   </CardDescription>
                   <div className="mt-2">
                     <Badge 
@@ -662,6 +722,50 @@ const DisputeDetailPage = () => {
               </div>
 
               <Separator className="bg-glass-border" />
+
+              {/* Verdict Banner */}
+              {verdict && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={`p-4 rounded-lg border ${
+                    verdict.isResolved 
+                      ? "bg-green-500/10 border-green-500/30" 
+                      : verdict.isRejected
+                      ? "bg-red-500/10 border-red-500/30"
+                      : "bg-blue-500/10 border-blue-500/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Crown className={`h-6 w-6 ${
+                      verdict.isResolved ? "text-green-500" : 
+                      verdict.isRejected ? "text-red-500" : "text-blue-500"
+                    }`} />
+                    <div className="flex-1">
+                      <div className="font-semibold text-foreground">
+                        {verdict.isResolved ? "Dispute Resolved" : 
+                         verdict.isRejected ? "Dispute Rejected" : "Current Leader"}
+                      </div>
+                      <div className="text-sm text-foreground-muted">
+                        {verdict.isResolved || verdict.isRejected ? (
+                          <>
+                            Winner: <strong className="text-foreground">
+                              {verdict.winner === 'client' ? dispute.client.name : dispute.freelancer.name}
+                            </strong>
+                            {verdict.amount > 0 && ` - Awarded: ${verdict.amount.toFixed(2)} SOL`}
+                          </>
+                        ) : (
+                          <>
+                            <strong className="text-foreground">
+                              {verdict.winner === 'client' ? dispute.client.name : dispute.freelancer.name}
+                            </strong> is leading with {verdict.winner === 'client' ? votesForPercentage : votesAgainstPercentage}% of votes
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               {/* Skills & Requirements */}
               <div className="flex flex-wrap gap-2">
@@ -688,15 +792,21 @@ const DisputeDetailPage = () => {
 
           {/* Right Column - Details */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Dispute Details & Evidence Tabs */}
-             <VotingStatsCard dispute={dispute} votesForPercentage={votesForPercentage} votesAgainstPercentage={votesAgainstPercentage} />
+            {/* Voting Stats & Details Tabs */}
+            <VotingStatsCard 
+              dispute={dispute} 
+              votesForPercentage={votesForPercentage} 
+              votesAgainstPercentage={votesAgainstPercentage}
+              verdict={verdict}
+            />
+            
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
               <Card className="glass-card">
                 <Tabs defaultValue="details" className="w-full">
                   <CardHeader>
                     <TabsList className="grid w-full grid-cols-3 bg-glass-secondary">
                       <TabsTrigger value="details">Details</TabsTrigger>
-                      <TabsTrigger value="work">Work</TabsTrigger>
+                      <TabsTrigger value="evidence">Evidence</TabsTrigger>
                       <TabsTrigger value="timeline">Timeline</TabsTrigger>
                     </TabsList>
                   </CardHeader>
@@ -715,8 +825,6 @@ const DisputeDetailPage = () => {
                         </Badge>
                         <p className="text-foreground leading-relaxed">{dispute.dispute.reason}</p>
                       </div>
-                      <Separator className="bg-glass-border" />
-            
                       <Separator className="bg-glass-border" />
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -780,54 +888,6 @@ const DisputeDetailPage = () => {
                       ))}
                     </TabsContent>
 
-                    <TabsContent value="work" className="space-y-4">
-                      <div className="p-4 rounded-lg glass-panel border-glass-border">
-                        <div className="flex items-center gap-2 mb-3">
-                          {dispute.workSubmission.submitted ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          )}
-                          <span className="font-semibold text-foreground">
-                            {dispute.workSubmission.submitted ? "Work Submitted" : "Work Not Submitted"}
-                          </span>
-                        </div>
-                        
-                        {dispute.workSubmission.submitted && (
-                          <>
-                            <div className="space-y-2 mb-4">
-                              <div className="text-sm text-foreground-muted">Submitted: {new Date(dispute.workSubmission.submittedAt!).toLocaleString()}</div>
-                              {dispute.workSubmission.description && (
-                                <p className="text-sm text-foreground">{dispute.workSubmission.description}</p>
-                              )}
-                            </div>
-                            {dispute.workSubmission.url && (
-                              <Button variant="outline" className="w-full group" asChild>
-                                <a href={dispute.workSubmission.url} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
-                                  View Work Submission
-                                </a>
-                              </Button>
-                            )}
-                            <Separator className="bg-glass-border my-4" />
-                            <div className="flex items-center gap-2">
-                              {dispute.workSubmission.approved ? (
-                                <>
-                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                  <span className="text-sm text-foreground">Approved on {new Date(dispute.workSubmission.approvedAt!).toLocaleDateString()}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Clock className="h-5 w-5 text-yellow-500" />
-                                  <span className="text-sm text-foreground">Pending Approval</span>
-                                </>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </TabsContent>
-
                     <TabsContent value="timeline" className="space-y-4">
                       <TimelineView dispute={dispute} />
                     </TabsContent>
@@ -836,23 +896,52 @@ const DisputeDetailPage = () => {
               </Card>
             </motion.div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - Show Vote button during voting period, Finalize after */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-4"
             >
-              <Button 
-                variant="neon" 
-                className="flex-1 group"
-                onClick={() => setVotingDialogOpen(true)}
-              >
-                <Vote className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
-                Cast Your Vote
-                <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
+              {/* Show Vote Button during voting period */}
+              {dispute.dispute.status?.voting && !verdict?.isResolved && !verdict?.isRejected && (
+                (() => {
+                  const votingEndTime = dispute.dispute.votingEnd?.toNumber() || 0;
+                  const currentTime = Math.floor(Date.now() / 1000);
+                  const votingActive = currentTime < votingEndTime;
+                  
+                  if (votingActive) {
+                    return (
+                      <Button 
+                        variant="neon" 
+                        className="flex-1 group"
+                        onClick={() => setVotingDialogOpen(true)}
+                      >
+                        <Vote className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
+                        Cast Your Vote
+                        <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    );
+                  }
+                  return null;
+                })()
+              )}
+
+              {/* Show Finalize Button after voting period ends */}
               <FinalizeDisputeButton />
+
+              {/* Show message if dispute is resolved */}
+              {(verdict?.isResolved || verdict?.isRejected) && (
+                <div className="flex-1 p-4 rounded-lg bg-green-500/10 border border-green-500/20 text-center">
+                  <CheckCircle2 className="h-6 w-6 text-green-500 mx-auto mb-2" />
+                  <div className="font-semibold text-foreground">Dispute Resolved</div>
+                  <div className="text-sm text-foreground-muted">
+                    This dispute has been {verdict.isResolved ? 'resolved' : 'rejected'}
+                  </div>
+                </div>
+              )}
+
+              
             </motion.div>
           </div>
         </div>
@@ -931,7 +1020,6 @@ const UserProfileCard = ({ user, role }: { user: UserProfile; role: string }) =>
               </div>
             )}
           </div>
-
         </CardContent>
       </Card>
     </motion.div>
@@ -939,11 +1027,24 @@ const UserProfileCard = ({ user, role }: { user: UserProfile; role: string }) =>
 };
 
 // Voting Stats Card Component
-const VotingStatsCard = ({ dispute, votesForPercentage, votesAgainstPercentage }: { 
+const VotingStatsCard = ({ 
+  dispute, 
+  votesForPercentage, 
+  votesAgainstPercentage,
+  verdict 
+}: { 
   dispute: DisputeDetail; 
   votesForPercentage: number; 
-  votesAgainstPercentage: number; 
+  votesAgainstPercentage: number;
+  verdict: any;
 }) => {
+  const votesForRaiser = dispute.dispute.votesForRaiser.toNumber();
+  const votesForAgainst = dispute.dispute.votesForAgainst.toNumber();
+  const totalVotes = votesForRaiser + votesForAgainst;
+  
+  const isRaiserClient = dispute.dispute.raiser.equals(dispute.client.fullAddress);
+  const isAgainstClient = dispute.dispute.against.equals(dispute.client.fullAddress);
+
   return (
     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
       <Card className="glass-card">
@@ -952,86 +1053,121 @@ const VotingStatsCard = ({ dispute, votesForPercentage, votesAgainstPercentage }
             <Vote className="h-5 w-5 text-neon-cyan" />
             Voting Statistics
           </CardTitle>
-          <CardDescription className="text-foreground-muted">Community voting results</CardDescription>
+          <CardDescription className="text-foreground-muted">
+            {verdict?.isResolved ? "Final Results" : "Live Voting Results"}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Votes For Freelancer */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-foreground-muted">Votes For Freelancer</span>
-              <span className="font-semibold text-green-500">{dispute.votesFor}</span>
+          {/* Votes Breakdown */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <div className="text-2xl font-bold text-green-500">{votesForRaiser}</div>
+              <div className="text-sm text-foreground-muted mt-1">Votes for {isRaiserClient ? "Client" : "Freelancer"}</div>
+              <div className="text-xs text-green-500 font-semibold mt-1">{votesForPercentage}%</div>
             </div>
-            <Progress value={votesForPercentage} className="h-2 bg-glass-secondary" />
-            <div className="text-xs text-right text-foreground-muted">{votesForPercentage}%</div>
+            <div className="text-center p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+              <div className="text-2xl font-bold text-red-500">{votesForAgainst}</div>
+              <div className="text-sm text-foreground-muted mt-1">Votes for {isAgainstClient ? "Client" : "Freelancer"}</div>
+              <div className="text-xs text-red-500 font-semibold mt-1">{votesAgainstPercentage}%</div>
+            </div>
           </div>
 
-          {/* Votes For Client */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-foreground-muted">Votes For Client</span>
-              <span className="font-semibold text-red-500">{dispute.votesAgainst}</span>
+          {/* Progress Bars */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-foreground-muted flex items-center gap-2">
+                  <User className="h-4 w-4 text-green-500" />
+                  {isRaiserClient ? dispute.client.name : dispute.freelancer.name}
+                </span>
+                <span className="font-semibold text-green-500">{votesForPercentage}%</span>
+              </div>
+              <Progress value={votesForPercentage} className="h-3 bg-glass-secondary" />
             </div>
-            <Progress value={votesAgainstPercentage} className="h-2 bg-glass-secondary" />
-            <div className="text-xs text-right text-foreground-muted">{votesAgainstPercentage}%</div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-foreground-muted flex items-center gap-2">
+                  <User className="h-4 w-4 text-red-500" />
+                  {isAgainstClient ? dispute.client.name : dispute.freelancer.name}
+                </span>
+                <span className="font-semibold text-red-500">{votesAgainstPercentage}%</span>
+              </div>
+              <Progress value={votesAgainstPercentage} className="h-3 bg-glass-secondary" />
+            </div>
           </div>
 
           <Separator className="bg-glass-border" />
 
-          
+          {/* Total Votes */}
+          <div className="flex items-center justify-between p-3 rounded-lg glass-panel border-glass-border">
+            <span className="text-sm text-foreground-muted">Total Votes Cast</span>
+            <span className="font-semibold text-foreground">{totalVotes}</span>
+          </div>
 
           {/* Voting Deadline */}
-          <div className="flex items-center justify-between p-3 rounded-lg glass-panel border-glass-border">
-            <span className="text-sm text-foreground-muted">Voting Ends</span>
-            <div className="text-right">
-              <div className="text-sm font-semibold text-foreground">
-                {new Date(dispute.votingStats.endDate).toLocaleDateString()}
-              </div>
-              <div className="text-xs text-foreground-muted">
-                {new Date(dispute.votingStats.endDate).toLocaleTimeString()}
-              </div>
-            </div>
-          </div>
-
-          {/* Status Banner */}
-          <div className="p-4 rounded-lg bg-gradient-to-br from-neon-cyan/10 to-neon-purple/10 border border-neon-cyan/20">
-            <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-neon-cyan mt-0.5" />
-              <div>
-                <div className="font-semibold text-sm mb-1 text-foreground">Voting in Progress</div>
-                <div className="text-xs text-foreground-muted">
-                  Cast your vote to help resolve this dispute fairly
-                </div>
-              </div>
-            </div>
-          </div>
           <div className="flex items-center justify-between p-3 rounded-lg glass-panel border-glass-border">
             <div>
               <span className="text-sm text-foreground-muted">Voting Ends</span>
               <div className="text-sm font-semibold text-foreground">
-                {new Date(dispute.votingStats.endDate).toLocaleDateString()}
+                {new Date(dispute.dispute.votingEnd.toNumber() * 1000).toLocaleDateString()}
               </div>
               <div className="text-xs text-foreground-muted">
-                {new Date(dispute.votingStats.endDate).toLocaleTimeString()}
+                {new Date(dispute.dispute.votingEnd.toNumber() * 1000).toLocaleTimeString()}
               </div>
             </div>
             <Badge 
               variant="outline" 
               className={
-                new Date() >= new Date(dispute.votingStats.endDate) 
+                Date.now() >= dispute.dispute.votingEnd.toNumber() * 1000
                   ? "bg-red-500/10 text-red-500 border-red-500/30"
                   : "bg-green-500/10 text-green-500 border-green-500/30"
               }
             >
-              {new Date() >= new Date(dispute.votingStats.endDate) ? "Ended" : "Active"}
+              {Date.now() >= dispute.dispute.votingEnd.toNumber() * 1000 ? "Ended" : "Active"}
             </Badge>
           </div>
+
+          {/* Status Banner */}
+          {!verdict?.isResolved && !verdict?.isRejected && (
+            <div className="p-4 rounded-lg bg-gradient-to-br from-neon-cyan/10 to-neon-purple/10 border border-neon-cyan/20">
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-neon-cyan mt-0.5" />
+                <div>
+                  <div className="font-semibold text-sm mb-1 text-foreground">
+                    {Date.now() >= dispute.dispute.votingEnd.toNumber() * 1000 ? "Voting Ended" : "Voting in Progress"}
+                  </div>
+                  <div className="text-xs text-foreground-muted">
+                    {Date.now() >= dispute.dispute.votingEnd.toNumber() * 1000 
+                      ? "Voting period has ended. Waiting for finalization."
+                      : "Cast your vote to help resolve this dispute fairly"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Final Verdict Banner */}
+          {verdict?.isResolved && (
+            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <div className="flex items-start gap-3">
+                <Crown className="h-5 w-5 text-green-500 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-sm mb-1 text-foreground">Dispute Resolved</div>
+                  <div className="text-xs text-foreground-muted">
+                    Winner: <strong>{verdict.winner === 'client' ? dispute.client.name : dispute.freelancer.name}</strong>
+                    {verdict.amount > 0 && ` - Awarded ${verdict.amount.toFixed(2)} SOL`}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>
   );
 };
 
-// Timeline View Component
 // Timeline View Component
 const TimelineView = ({ dispute }: { dispute: DisputeDetail }) => {
   const timelineSteps = [
@@ -1061,15 +1197,17 @@ const TimelineView = ({ dispute }: { dispute: DisputeDetail }) => {
     },
     {
       label: "Voting Started",
-      date: dispute.timeline.votingStarted,
+      date: new Date(dispute.dispute.votingStart.toNumber() * 1000).toISOString(),
       active: dispute.status === "voting",
       completed: dispute.status !== "open",
     },
     {
-      label: "Resolved",
-      date: dispute.timeline.resolved,
+      label: dispute.dispute.status?.resolved ? "Resolved" : "Voting Ends",
+      date: dispute.dispute.status?.resolved 
+        ? dispute.timeline.resolved
+        : new Date(dispute.dispute.votingEnd.toNumber() * 1000).toISOString(),
       active: dispute.status === "resolved",
-      completed: dispute.status === "resolved" || dispute.status === "rejected",
+      completed: dispute.status === "resolved" || dispute.status === "rejected" || Date.now() >= dispute.dispute.votingEnd.toNumber() * 1000,
     },
   ];
 
@@ -1097,9 +1235,21 @@ const TimelineView = ({ dispute }: { dispute: DisputeDetail }) => {
           <div className="flex-1">
             <div className="font-semibold text-foreground mb-2">Conflict Details</div>
             
-            {/* Who initiated the dispute */}
             <div className="space-y-3">
-              
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-foreground-muted">Dispute Initiated By:</span>
+                <Badge 
+                  variant="outline" 
+                  className={
+                    dispute.dispute.raiser.equals(dispute.client.fullAddress)
+                      ? "bg-neon-cyan/10 text-neon-cyan border-neon-cyan/30"
+                      : "bg-neon-purple/10 text-neon-purple border-neon-purple/30"
+                  }
+                >
+                  {dispute.dispute.raiser.equals(dispute.client.fullAddress) ? "Client" : "Freelancer"}
+                </Badge>
+              </div>
+
               <div className="flex items-center justify-between">
                 <span className="text-sm text-foreground-muted">Dispute Against:</span>
                 <Badge 

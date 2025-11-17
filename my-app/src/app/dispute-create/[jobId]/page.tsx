@@ -15,26 +15,28 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/(module)/ui/card";
 import { Label } from "@/app/(module)/ui/label";
 import { Textarea } from "@/app/(module)/ui/textarea";
 import { Button } from "@/app/(module)/ui/button";
 import { Badge } from "@/app/(module)/ui/badge";
 import { getProgram } from "@/(anchor)/setup";
-
+import BN from "bn.js";
 
 const RaiseDisputePage = () => {
-  const navigate = useRouter();
-  const{ search} = useParams();
+  const router = useRouter();
+  const params = useParams();
   const { wallet, publicKey } = useWallet();
-  const jobId = search;
   const searchParams = useSearchParams();
-  const userRole = searchParams.get("role") || "client";
-  console.log(userRole)
-
   
+  // Correct way to get jobId from the route /dispute-create/[jobId]
+  const jobId = params.jobId as string;
+  const userRole = searchParams.get("role") || "client";
+  
+  console.log("Job ID:", jobId);
+  console.log("User Role:", userRole);
+
   const [reason, setReason] = useState("");
-  const [votingPeriod, setVotingPeriod] = useState(5); // Default 3 days
+  const [votingPeriod, setVotingPeriod] = useState(5); // Default 5 minutes
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const maxReasonChars = 1200;
@@ -42,49 +44,81 @@ const RaiseDisputePage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("handleSubmit")
+    console.log("handleSubmit");
+    
     if (!wallet?.adapter?.publicKey || !publicKey) {
       toast.error("Wallet not connected");
       return;
     }
-    console.log("handleSubmit1")
+    
+    console.log("Job ID:", jobId);
+    
     if (!jobId) {
       toast.error("Job ID not found");
       return;
     }
-    console.log("handleSubmit2")
+    
     if (reason.trim().length < 50) {
       toast.error("Dispute reason must be at least 50 characters");
       return;
     }
-    console.log("handleSubmit3`")
+    
     if (reason.trim().length > maxReasonChars) {
       toast.error(`Dispute reason must be less than ${maxReasonChars} characters`);
       return;
     }
-
+  
     try {
       setIsSubmitting(true);
       
-      const jobAccount = new PublicKey(jobId);
-      const program = getProgram(wallet.adapter);
-      const jobData = await program.account.job.fetch(jobAccount);
-      const numericJobId = jobData.jobId;
-      // Convert voting period from days to seconds
-      const votingPeriodSeconds = votingPeriod * 60;
+      // Validate and convert jobId to PublicKey
+      let jobAccount: PublicKey;
+      try {
+        jobAccount = new PublicKey(jobId);
+      } catch (error) {
+        toast.error("Invalid job ID format");
+        return;
+      }
       
-      const tx = await program.methods
-        .raiseDispute(numericJobId, reason, votingPeriodSeconds)
-        .accounts({
-          job: jobAccount,
-          authority: publicKey,
-        })
-        .rpc();
-
+      const program = getProgram(wallet.adapter);
+      
+      // Fetch job data to get numeric jobId
+      // Fetch job data to get numeric jobId
+            const jobData = await program.account.job.fetch(jobAccount);
+            const numericJobId = jobData.jobId; // Convert BN to number
+            
+            // Derive the raiser's user PDA
+            const [raiserUserPda] = PublicKey.findProgramAddressSync(
+              [Buffer.from("user"), publicKey.toBuffer()],
+              program.programId
+            );
+            
+            // Convert voting period from minutes to seconds and wrap in BN
+            const votingPeriodSeconds = new BN(votingPeriod * 60);
+            
+            console.log("Raising dispute with:", {
+              numericJobId,
+              reason,
+              votingPeriodSeconds: votingPeriodSeconds.toString(),
+              jobAccount: jobAccount.toString(),
+              authority: publicKey.toString(),
+              raiserUser: raiserUserPda.toString()
+            });
+            
+            const tx = await program.methods
+              .raiseDispute(numericJobId, reason, votingPeriodSeconds)
+              .accounts({
+                job: jobAccount,
+                authority: publicKey,
+                raiserUser: raiserUserPda,
+              })
+              .rpc();
+      
+  
       console.log("Dispute raised successfully:", tx);
       
       toast.success("Dispute raised successfully! The community will now vote on the resolution.");
-      navigate.push(`/jobs/${jobId}?role=${userRole}`);
+      router.push(`/jobs/${jobId}?role=${userRole}`);
     } catch (error: any) {
       console.error("Failed to raise dispute:", error);
       
@@ -124,6 +158,22 @@ const RaiseDisputePage = () => {
     },
   ];
 
+  // Add a check to see if jobId is available
+  if (!jobId) {
+    return (
+      <div className="min-h-screen p-6 lg:p-8 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-foreground mb-2">Job ID Missing</h1>
+          <p className="text-foreground-muted mb-4">Unable to find the job information.</p>
+          <Button onClick={() => router.push("/jobs")}>
+            Back to Jobs
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-6 lg:p-8">
       {/* Background Effects */}
@@ -141,7 +191,7 @@ const RaiseDisputePage = () => {
         >
           <Button
             variant="ghost"
-            onClick={() => navigate.push(`/jobs/${jobId}?role=${userRole}`)}
+            onClick={() => router.push(`/jobs/${jobId}?role=${userRole}`)}
             className="gap-2 hover:text-neon-cyan mb-6"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -183,7 +233,9 @@ const RaiseDisputePage = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-semibold text-foreground">Job ID</h3>
-                        <p className="text-sm text-foreground-muted font-mono">{jobId}</p>
+                        <p className="text-sm text-foreground-muted font-mono truncate max-w-[300px]">
+                          {jobId}
+                        </p>
                       </div>
                       <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
                         {userRole === 'client' ? 'As Client' : 'As Freelancer'}
@@ -223,7 +275,7 @@ const RaiseDisputePage = () => {
                   </div>
                 </div>
 
-                
+                  
 
                 {/* Warning Notice */}
                 <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
@@ -266,7 +318,6 @@ const RaiseDisputePage = () => {
                       <div className="group-hover:rotate-1 transition-transform">
                         Raise Dispute
                       </div>
-  
                       <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     </>
                   )}

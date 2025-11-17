@@ -1,6 +1,7 @@
 import { SystemProgram, PublicKey } from "@solana/web3.js";
 import { getProgram, findUserPDA } from "@/(anchor)/setup";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function registerUser(wallet: any, name: string, isClient = true, isFreelancer = false) {
   try {
     // ✅ Add validation checks

@@ -105,7 +105,7 @@ export const DashboardComponent = ({ role }: { role:  "freelancer" | "client" })
                 />
 
                 {/* Metrics Cards */}
-                <MetricsCards userRole={userRole} />
+                <MetricsCards />
 
                 {/* Resume & Portfolio (Freelancer only) */}
                 <ResumePortfolio userRole={userRole} user={user} />

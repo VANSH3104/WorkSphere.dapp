@@ -9,11 +9,15 @@ import {
   CheckCircle,
   XCircle,
   Hourglass,
-  User,
   Star,
-  Zap,
-  Shield
+  Shield,
+  FileText,
+  Target,
+  Users,
+  Award
 } from "lucide-react";
+import { useUser } from "@/(providers)/userProvider";
+import { BN } from "@coral-xyz/anchor";
 
 interface MetricCardProps {
   title: string;
@@ -23,28 +27,6 @@ interface MetricCardProps {
   icon: React.ElementType;
   color: string;
   index: number;
-}
-
-interface UserProfile {
-  name: string;
-  address: string;
-  reputation: number;
-  completedJobs: number;
-  cancelledJobs: number;
-  disputesRaised: number;
-  totalEarnings: number;
-  totalSpent: number;
-  resume?: {
-    skills: string[];
-  };
-}
-
-interface MetricsCardsProps {
-  userRole: "freelancer" | "client";
-  userData: UserProfile;
-  activeJobs?: number;
-  avgResponseTime?: number;
-  successRate?: number;
 }
 
 // Color mapping for consistent styling
@@ -100,7 +82,7 @@ const MetricCard = ({ title, value, target, change, icon: Icon, color, index }: 
   useEffect(() => {
     const timer = setTimeout(() => {
       let currentValue = 0;
-      const increment = target / 60; // 60 frames animation
+      const increment = target / 60;
       const counter = setInterval(() => {
         currentValue += increment;
         if (currentValue >= target) {
@@ -108,10 +90,10 @@ const MetricCard = ({ title, value, target, change, icon: Icon, color, index }: 
           clearInterval(counter);
         }
         setDisplayValue(Math.floor(currentValue));
-      }, 16); // ~60fps
+      }, 16);
 
       return () => clearInterval(counter);
-    }, index * 150); // Stagger the animations
+    }, index * 150);
 
     return () => clearTimeout(timer);
   }, [target, index]);
@@ -132,7 +114,6 @@ const MetricCard = ({ title, value, target, change, icon: Icon, color, index }: 
       }}
       whileHover={{ scale: 1.02 }}
     >
-      {/* Background Glow Effect */}
       <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 bg-gradient-to-br ${colorStyles.gradient} to-transparent`} />
       
       <div className="relative z-10">
@@ -177,7 +158,6 @@ const MetricCard = ({ title, value, target, change, icon: Icon, color, index }: 
           {title}
         </motion.p>
 
-        {/* Animated Border */}
         <motion.div
           className={`absolute bottom-0 left-0 h-1 bg-gradient-to-r ${colorStyles.gradient} to-transparent`}
           initial={{ width: "0%" }}
@@ -189,52 +169,116 @@ const MetricCard = ({ title, value, target, change, icon: Icon, color, index }: 
   );
 };
 
-export const MetricsCards = ({ 
-  userRole, 
-  userData, 
-  activeJobs = 0, 
-  avgResponseTime = 0,
-  successRate = 0 
-}: MetricsCardsProps) => {
+export const MetricsCards = () => {
+  const { user } = useUser();
   
-  // Calculate derived metrics from userData
-  const calculateSuccessRate = () => {
-    if (userData.completedJobs === 0) return 0;
-    const totalJobs = userData.completedJobs + userData.cancelledJobs;
-    return Math.round((userData.completedJobs / totalJobs) * 100);
+  if (!user) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <div key={index} className="glass-card p-6 animate-pulse">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-gray-300/20"></div>
+              <div className="w-16 h-6 rounded-full bg-gray-300/20"></div>
+            </div>
+            <div className="h-8 bg-gray-300/20 rounded mb-2"></div>
+            <div className="h-4 bg-gray-300/20 rounded"></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Helper function to convert BN to number safely
+  const bnToNumber = (bn: BN): number => {
+    try {
+      return bn.toNumber();
+    } catch (error) {
+      // If the number is too large, convert to string and parse as number
+      return parseFloat(bn.toString());
+    }
   };
 
-  const calculateAvgRating = () => {
-    // Assuming reputation score out of 100 converts to 5-star rating
-    return (userData.reputation / 20).toFixed(1);
+  // Convert all BN fields to numbers
+  const activeJobs = bnToNumber(user.activeJobs);
+  const cancelledJobs = bnToNumber(user.cancelledJobs);
+  const completedJobs = bnToNumber(user.completedJobs);
+  const disputesRaised = bnToNumber(user.disputesRaised);
+  const disputesResolved = bnToNumber(user.disputesResolved);
+  const pendingJobs = bnToNumber(user.pendingJobs);
+  const reputation = bnToNumber(user.reputation);
+  const totalEarnings = bnToNumber(user.totalEarnings);
+  const totalSpent = bnToNumber(user.totalSpent);
+
+  // Convert SOL from lamports (assuming 1 SOL = 1_000_000_000 lamports)
+  const solToLamports = 1000000000;
+  const totalEarningsSOL = totalEarnings / solToLamports;
+  const totalSpentSOL = totalSpent / solToLamports;
+
+  // Calculate derived metrics
+  const calculateSuccessRate = (): number => {
+    if (completedJobs === 0) return 0;
+    const totalJobs = completedJobs + cancelledJobs;
+    return Math.round((completedJobs / totalJobs) * 100);
   };
 
-  const calculateCompletionRate = () => {
-    if (userData.completedJobs === 0) return 0;
-    const totalJobs = userData.completedJobs + userData.cancelledJobs;
-    return Math.round((userData.completedJobs / totalJobs) * 100);
+  const calculateAvgRating = (): string => {
+    // Convert reputation (0-100) to 5-star rating
+    return (reputation / 20).toFixed(1);
   };
 
-  // Freelancer-specific metrics
-  const freelancerMetrics = [
+  const calculateCompletionRate = (): number => {
+    if (completedJobs === 0) return 0;
+    const totalJobs = completedJobs + cancelledJobs;
+    return Math.round((completedJobs / totalJobs) * 100);
+  };
+
+  const calculateProductivity = (): number => {
+    if (completedJobs === 0) return 0;
+    const totalJobs = completedJobs + pendingJobs + cancelledJobs;
+    return Math.round((completedJobs / totalJobs) * 100);
+  };
+
+  const calculateResponseTime = (): string => {
+    // Simple calculation based on user activity and reputation
+    const baseTime = user.isFreelancer ? 2.5 : 1.8;
+    const reputationFactor = reputation / 100;
+    return (baseTime - (reputationFactor * 1.2)).toFixed(1);
+  };
+
+  const calculateTotalJobs = (): number => {
+    return completedJobs + activeJobs + pendingJobs + cancelledJobs;
+  };
+
+  const calculateDisputeResolutionRate = (): number => {
+    if (disputesRaised === 0) return 0;
+    return Math.round((disputesResolved / disputesRaised) * 100);
+  };
+
+  // Determine user role
+  const isFreelancer = user.isFreelancer;
+  const isClient = user.isClient;
+
+  // Common metrics for both roles
+  const commonMetrics = [
     {
-      title: "Total Earnings",
-      value: `${userData.totalEarnings.toFixed(1)} SOL`,
-      target: userData.totalEarnings,
-      change: userData.totalEarnings > 50 ? "+12%" : "+5%",
-      icon: DollarSign,
+      title: "Reputation Score",
+      value: reputation.toString(),
+      target: reputation,
+      change: reputation > 80 ? "+5" : "+2",
+      icon: Star,
       color: "neon-gold"
     },
     {
-      title: "Jobs Completed",
-      value: userData.completedJobs.toString(),
-      target: userData.completedJobs,
-      change: userData.completedJobs > 20 ? "+8%" : "+3%",
+      title: "Completed Jobs",
+      value: completedJobs.toString(),
+      target: completedJobs,
+      change: completedJobs > 20 ? "+8%" : "+3%",
       icon: CheckCircle,
       color: "success"
     },
     {
-      title: "Active Projects",
+      title: "Active Jobs",
       value: activeJobs.toString(),
       target: activeJobs,
       change: activeJobs > 5 ? "+2" : "+1",
@@ -250,36 +294,49 @@ export const MetricsCards = ({
       color: "neon-purple"
     },
     {
-      title: "Reputation Score",
-      value: userData.reputation.toString(),
-      target: userData.reputation,
-      change: userData.reputation > 80 ? "+5" : "+2",
-      icon: Star,
+      title: "Total Jobs",
+      value: calculateTotalJobs().toString(),
+      target: calculateTotalJobs(),
+      change: calculateTotalJobs() > 30 ? "+5" : "+2",
+      icon: FileText,
+      color: "warning"
+    }
+  ];
+
+  // Freelancer-specific metrics
+  const freelancerMetrics = [
+    {
+      title: "Total Earnings",
+      value: `${totalEarningsSOL.toFixed(2)} SOL`,
+      target: totalEarningsSOL,
+      change: totalEarningsSOL > 50 ? "+12%" : "+5%",
+      icon: DollarSign,
       color: "neon-gold"
     },
     {
-      title: "Response Time",
-      value: `${avgResponseTime}h`,
-      target: avgResponseTime,
-      change: avgResponseTime < 2 ? "-15%" : "-5%",
-      icon: Clock,
+      title: "Pending Jobs",
+      value: pendingJobs.toString(),
+      target: pendingJobs,
+      change: pendingJobs > 3 ? "+2" : "+1",
+      icon: Hourglass,
       color: "warning"
     },
+    ...commonMetrics,
     {
-      title: "Disputes Involved",
-      value: userData.disputesRaised.toString(),
-      target: userData.disputesRaised,
-      change: userData.disputesRaised > 0 ? "+1" : "0",
-      icon: AlertTriangle,
-      color: "destructive"
+      title: "Disputes Resolved",
+      value: `${calculateDisputeResolutionRate()}%`,
+      target: calculateDisputeResolutionRate(),
+      change: calculateDisputeResolutionRate() > 80 ? "+3%" : "+1%",
+      icon: Shield,
+      color: "success"
     },
     {
-      title: "Cancelled Jobs",
-      value: userData.cancelledJobs.toString(),
-      target: userData.cancelledJobs,
-      change: userData.cancelledJobs > 0 ? "+1" : "0",
-      icon: XCircle,
-      color: "foreground-muted"
+      title: "Productivity",
+      value: `${calculateProductivity()}%`,
+      target: calculateProductivity(),
+      change: calculateProductivity() > 80 ? "+3%" : "+1%",
+      icon: Target,
+      color: "success"
     }
   ];
 
@@ -287,71 +344,77 @@ export const MetricsCards = ({
   const clientMetrics = [
     {
       title: "Total Spent",
-      value: `${userData.totalSpent.toFixed(1)} SOL`,
-      target: userData.totalSpent,
-      change: userData.totalSpent > 30 ? "+18%" : "+8%",
+      value: `${totalSpentSOL.toFixed(2)} SOL`,
+      target: totalSpentSOL,
+      change: totalSpentSOL > 30 ? "+18%" : "+8%",
       icon: DollarSign,
       color: "neon-gold"
     },
     {
-      title: "Projects Posted",
-      value: userData.completedJobs.toString(),
-      target: userData.completedJobs,
-      change: userData.completedJobs > 15 ? "+4" : "+2",
-      icon: Briefcase,
-      color: "neon-cyan"
-    },
-    {
-      title: "Completed Projects",
-      value: userData.completedJobs.toString(),
-      target: userData.completedJobs,
-      change: userData.completedJobs > 10 ? "+3" : "+1",
-      icon: CheckCircle,
-      color: "success"
-    },
-    {
-      title: "Active Projects",
-      value: activeJobs.toString(),
-      target: activeJobs,
-      change: activeJobs > 3 ? "+1" : "0",
+      title: "Pending Jobs",
+      value: pendingJobs.toString(),
+      target: pendingJobs,
+      change: pendingJobs > 2 ? "+1" : "0",
       icon: Hourglass,
-      color: "neon-purple"
+      color: "warning"
     },
-    {
-      title: "Average Rating",
-      value: `${calculateAvgRating()}★`,
-      target: parseFloat(calculateAvgRating()),
-      change: parseFloat(calculateAvgRating()) > 4.5 ? "+0.2" : "+0.1",
-      icon: Star,
-      color: "neon-gold"
-    },
+    ...commonMetrics,
     {
       title: "Completion Rate",
       value: `${calculateCompletionRate()}%`,
       target: calculateCompletionRate(),
       change: calculateCompletionRate() > 85 ? "+3%" : "+1%",
-      icon: TrendingUp,
-      color: "warning"
+      icon: Award,
+      color: "neon-cyan"
     },
     {
       title: "Disputes Raised",
-      value: userData.disputesRaised.toString(),
-      target: userData.disputesRaised,
-      change: userData.disputesRaised > 0 ? "+1" : "0",
-      icon: Shield,
+      value: disputesRaised.toString(),
+      target: disputesRaised,
+      change: disputesRaised > 0 ? "+1" : "0",
+      icon: AlertTriangle,
       color: "destructive"
-    },
-    {
-      title: "Cancelled Projects",
-      value: userData.cancelledJobs.toString(),
-      target: userData.cancelledJobs,
-      change: userData.cancelledJobs > 0 ? "+1" : "0",
-      icon: XCircle,
-      color: "foreground-muted"
     }
   ];
 
-  const metrics = userRole === "freelancer" ? freelancerMetrics : clientMetrics;
+  // Additional metrics for users who are both client and freelancer
+  const hybridMetrics = [
+    {
+      title: "Total Earnings",
+      value: `${totalEarningsSOL.toFixed(2)} SOL`,
+      target: totalEarningsSOL,
+      change: totalEarningsSOL > 50 ? "+12%" : "+5%",
+      icon: DollarSign,
+      color: "neon-gold"
+    },
+    {
+      title: "Total Spent",
+      value: `${totalSpentSOL.toFixed(2)} SOL`,
+      target: totalSpentSOL,
+      change: totalSpentSOL > 30 ? "+18%" : "+8%",
+      icon: DollarSign,
+      color: "neon-cyan"
+    },
+    ...commonMetrics,
+    {
+      title: "Net Balance",
+      value: `${(totalEarningsSOL - totalSpentSOL).toFixed(2)} SOL`,
+      target: Math.abs(totalEarningsSOL - totalSpentSOL),
+      change: (totalEarningsSOL - totalSpentSOL) > 0 ? "+" : "-",
+      icon: Users,
+      color: "neon-purple"
+    }
+  ];
+
+  // Determine which metrics to show based on user role
+  let metrics = commonMetrics;
+  if (isFreelancer && isClient) {
+    metrics = hybridMetrics;
+  } else if (isFreelancer) {
+    metrics = freelancerMetrics;
+  } else if (isClient) {
+    metrics = clientMetrics;
+  }
 
   return (
     <motion.div 
@@ -370,4 +433,3 @@ export const MetricsCards = ({
     </motion.div>
   );
 };
-

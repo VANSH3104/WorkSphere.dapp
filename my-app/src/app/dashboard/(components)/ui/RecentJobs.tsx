@@ -1,173 +1,277 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Clock, 
   DollarSign, 
   User, 
   Eye, 
-  MessageCircle, 
-  Star,
+  MessageCircle,
   Calendar,
-  MapPin,
-  ExternalLink
+  ExternalLink,
+  Briefcase,
+  CheckCircle,
+  AlertTriangle,
+  Hourglass
 } from "lucide-react";
 import { Badge } from "@/app/(module)/ui/badge";
 import { Button } from "@/app/(module)/ui/button";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 
-
-interface Job {
-  id: string;
-  title: string;
-  client: string;
-  clientRating: number;
-  amount: string;
-  status: "active" | "completed" | "pending" | "cancelled" | "in_progress" | "under_review";
-  date: string;
-  description: string;
-  skills: string[];
-  proposals?: number;
-  deadline?: string;
-  location: string;
-}
+import { BN } from "@coral-xyz/anchor";
+import { fetchJobs, fetchMyJobs } from "@/(anchor)/actions/fetchjob";
 
 interface RecentJobsProps {
-  userRole: "freelancer" | "client";
+  limit?: number;
+  userRole: "freelancer" | "client"; // Keep the prop
 }
 
-export const RecentJobs = ({ userRole }: RecentJobsProps) => {
+// Helper function to safely convert BN to number
+const bnToNumber = (bn: BN): number => {
+  try {
+    return bn.toNumber();
+  } catch (error) {
+    return parseFloat(bn.toString());
+  }
+};
+
+export const RecentJobs = ({ limit = 4, userRole }: RecentJobsProps) => {
   const [hoveredJob, setHoveredJob] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const { wallet, publicKey } = useWallet();
+  const router = useRouter();
 
-  const freelancerJobs: Job[] = [
-    {
-      id: "1",
-      title: "DeFi Protocol Development",
-      client: "CryptoVentures DAO",
-      clientRating: 4.9,
-      amount: "250 SOL",
-      status: "in_progress",
-      date: "2 hours ago",
-      description: "Building a comprehensive DeFi lending protocol with advanced features including flash loans, yield farming, and governance tokens.",
-      skills: ["Rust", "Anchor", "Solana", "TypeScript"],
-      deadline: "Dec 15, 2024",
-      location: "Remote"
-    },
-    {
-      id: "2",
-      title: "NFT Marketplace Smart Contracts",
-      client: "ArtBlock Studios",
-      clientRating: 4.8,
-      amount: "180 SOL",
-      status: "under_review",
-      date: "1 day ago",
-      description: "Develop smart contracts for a next-generation NFT marketplace with royalty distribution and advanced auction mechanisms.",
-      skills: ["Solana", "Metaplex", "Rust", "Web3.js"],
-      deadline: "Nov 30, 2024",
-      location: "Remote"
-    },
-    {
-      id: "3",
-      title: "Web3 Gaming Platform",
-      client: "GameFi Innovations",
-      clientRating: 4.7,
-      amount: "420 SOL",
-      status: "completed",
-      date: "3 days ago",
-      description: "Full-stack development of a blockchain-based gaming platform with in-game asset trading and tournament systems.",
-      skills: ["React", "Node.js", "Solana", "MongoDB"],
-      deadline: "Completed",
-      location: "Remote"
-    },
-    {
-      id: "4",
-      title: "DAO Governance Dashboard",
-      client: "DecentralHub",
-      clientRating: 4.6,
-      amount: "95 SOL",
-      status: "pending",
-      date: "5 days ago",
-      description: "Create a comprehensive dashboard for DAO governance including proposal creation, voting mechanisms, and treasury management.",
-      skills: ["React", "TypeScript", "Solana", "Chart.js"],
-      deadline: "Jan 10, 2025",
-      location: "Remote"
-    }
-  ];
+  const isFreelancer = userRole === "freelancer";
+  const isClient = userRole === "client";
 
-  const clientJobs: Job[] = [
-    {
-      id: "1",
-      title: "E-commerce Platform Redesign",
-      client: "Alex Chen (You)",
-      clientRating: 4.9,
-      amount: "150 SOL",
-      status: "active",
-      date: "1 hour ago",
-      description: "Looking for a skilled developer to redesign our e-commerce platform with modern UI/UX and blockchain integration.",
-      skills: ["React", "Node.js", "PostgreSQL", "Stripe"],
-      proposals: 12,
-      deadline: "Dec 20, 2024",
-      location: "Remote"
-    },
-    {
-      id: "2",
-      title: "Smart Contract Audit",
-      client: "Alex Chen (You)",
-      clientRating: 4.9,
-      amount: "75 SOL",
-      status: "in_progress",
-      date: "2 days ago",
-      description: "Need comprehensive security audit for our DeFi smart contracts before mainnet deployment.",
-      skills: ["Solana", "Security", "Rust", "Audit"],
-      proposals: 8,
-      deadline: "Nov 25, 2024",
-      location: "Remote"
-    },
-    {
-      id: "3",
-      title: "Mobile App Development",
-      client: "Alex Chen (You)",
-      clientRating: 4.9,
-      amount: "300 SOL",
-      status: "completed",
-      date: "1 week ago",
-      description: "Cross-platform mobile application for crypto portfolio management with real-time price tracking.",
-      skills: ["React Native", "TypeScript", "Redux", "Firebase"],
-      proposals: 15,
-      deadline: "Completed",
-      location: "Remote"
-    }
-  ];
+  useEffect(() => {
+    const loadJobs = async () => {
+      if (!wallet || !publicKey) {
+        setLoading(false);
+        return;
+      }
 
-  const jobs = userRole === "freelancer" ? freelancerJobs : clientJobs;
+      try {
+        setLoading(true);
+        setError(null);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+        let jobData: Job[] = [];
+
+        if (isFreelancer) {
+          jobData = await fetchJobs(wallet.adapter, {
+            statusFilter: 'open',
+            limit
+          });
+        } else if (isClient) {
+          jobData = await fetchMyJobs(wallet.adapter, 'all');
+          if (limit) {
+            jobData = jobData.slice(0, limit);
+          }
+        }
+
+        setJobs(jobData);
+      } catch (err) {
+        console.error("Error loading jobs:", err);
+        setError("Failed to load jobs");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadJobs();
+  }, [wallet, publicKey, isFreelancer, isClient, limit]);
+
+  const getStatusColor = (status: any) => {
+    const statusKey = Object.keys(status)[0] as string;
+    
+    switch (statusKey) {
       case "completed":
-        return "bg-success/20 text-success border-success";
-      case "in_progress":
-        return "bg-neon-cyan/20 text-neon-cyan border-neon-cyan";
-      case "under_review":
-        return "bg-neon-gold/20 text-neon-gold border-neon-gold";
-      case "active":
-        return "bg-neon-purple/20 text-neon-purple border-neon-purple";
-      case "pending":
-        return "bg-warning/20 text-warning border-warning";
+        return "bg-green-500/20 text-green-500 border-green-500/30";
+      case "inProgress":
+        return "bg-blue-500/20 text-blue-500 border-blue-500/30";
+      case "open":
+        return "bg-amber-500/20 text-amber-500 border-amber-500/30";
+      case "disputed":
+        return "bg-red-500/20 text-red-500 border-red-500/30";
       case "cancelled":
-        return "bg-destructive/20 text-destructive border-destructive";
+        return "bg-gray-500/20 text-gray-500 border-gray-500/30";
       default:
-        return "bg-glass-secondary text-foreground-muted border-glass-border";
+        return "bg-gray-500/20 text-gray-500 border-gray-500/30";
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "in_progress":
+  const getStatusText = (status: any) => {
+    const statusKey = Object.keys(status)[0];
+    
+    switch (statusKey) {
+      case "inProgress":
         return "In Progress";
-      case "under_review":
-        return "Under Review";
+      case "open":
+        return "Open";
+      case "disputed":
+        return "Disputed";
       default:
-        return status.charAt(0).toUpperCase() + status.slice(1);
+        return statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
     }
   };
+
+  const getStatusIcon = (status: any) => {
+    const statusKey = Object.keys(status)[0];
+    
+    switch (statusKey) {
+      case "completed":
+        return <CheckCircle className="w-4 h-4" />;
+      case "inProgress":
+        return <Briefcase className="w-4 h-4" />;
+      case "open":
+        return <Hourglass className="w-4 h-4" />;
+      case "disputed":
+        return <AlertTriangle className="w-4 h-4" />;
+      case "cancelled":
+        return <AlertTriangle className="w-4 h-4" />;
+      default:
+        return <Briefcase className="w-4 h-4" />;
+    }
+  };
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp * 1000);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return "1 day ago";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+    return date.toLocaleDateString();
+  };
+
+  const formatDeadline = (timestamp: number) => {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleDateString();
+  };
+
+  const handleViewAll = () => {
+    if (isFreelancer) {
+      router.push('/jobs');
+    } else if (isClient) {
+      router.push('/manage-jobs');
+    }
+  };
+
+  const handleViewJob = (jobPublicKey: PublicKey) => {
+    if (isFreelancer) {
+      router.push(`/jobs/${jobPublicKey.toString()}?role=${userRole}`);
+    } else if (isClient) {
+      router.push(`/manage-jobs/${jobPublicKey.toString()}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <motion.div 
+        className="glass-card p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-foreground">
+            {isFreelancer ? "Available Jobs" : "Your Jobs"}
+          </h2>
+          <Button variant="outline" size="sm" className="border-glass-border" disabled>
+            View All
+          </Button>
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: limit }).map((_, index) => (
+            <div key={index} className="glass-panel p-5 rounded-xl animate-pulse">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <div className="h-6 bg-gray-300/20 rounded mb-2 w-3/4"></div>
+                  <div className="h-4 bg-gray-300/20 rounded mb-3 w-1/2"></div>
+                  <div className="h-4 bg-gray-300/20 rounded mb-4 w-full"></div>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from({ length: 3 }).map((_, skillIndex) => (
+                      <div key={skillIndex} className="w-16 h-6 bg-gray-300/20 rounded"></div>
+                    ))}
+                  </div>
+                </div>
+                <div className="w-20 h-6 bg-gray-300/20 rounded ml-4"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.div 
+        className="glass-card p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <div className="text-center py-8">
+          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Unable to load jobs</h3>
+          <p className="text-foreground-muted mb-4">{error}</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (jobs.length === 0) {
+    return (
+      <motion.div 
+        className="glass-card p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-foreground">
+            {isFreelancer ? "Available Jobs" : "Your Jobs"}
+          </h2>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-glass-border hover:bg-gradient-primary hover:text-white"
+            onClick={handleViewAll}
+          >
+            View All
+          </Button>
+        </div>
+        <div className="text-center py-8">
+          <Briefcase className="w-16 h-16 text-foreground-muted mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">
+            {isFreelancer ? "No jobs available" : "No jobs posted yet"}
+          </h3>
+          <p className="text-foreground-muted mb-4">
+            {isFreelancer 
+              ? "Check back later for new job opportunities" 
+              : "Start by posting your first job"
+            }
+          </p>
+          <Button 
+            variant="neon" 
+            onClick={handleViewAll}
+          >
+            {isFreelancer ? "Browse All Jobs" : "Post a Job"}
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div 
@@ -178,157 +282,121 @@ export const RecentJobs = ({ userRole }: RecentJobsProps) => {
     >
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-foreground">
-          {userRole === "freelancer" ? "Recent Jobs" : "Your Posted Jobs"}
+          {isFreelancer ? "Available Jobs" : "Your Jobs"}
         </h2>
-        <Button variant="outline" size="sm" className="hover:bg-gradient-primary hover:text-white border-glass-border">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="hover:bg-gradient-primary hover:text-white border-glass-border"
+          onClick={handleViewAll}
+        >
           View All
         </Button>
       </div>
 
       <div className="space-y-4">
-        {jobs.map((job, index) => (
-          <motion.div
-            key={job.id}
-            className="glass-panel p-5 rounded-xl hover-lift cursor-pointer relative overflow-hidden group"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1, duration: 0.6 }}
-            onMouseEnter={() => setHoveredJob(job.id)}
-            onMouseLeave={() => setHoveredJob(null)}
-            whileHover={{ 
-              scale: 1.02,
-              rotateY: 2,
-              rotateX: 1
-            }}
-            style={{ transformStyle: "preserve-3d" }}
-          >
-            {/* Animated Background Gradient */}
-            <motion.div
-              className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500"
-              style={{
-                background: `linear-gradient(135deg, 
-                  hsl(var(--neon-primary)) 0%, 
-                  hsl(var(--neon-secondary)) 50%, 
-                  hsl(var(--neon-accent)) 100%)`
-              }}
-            />
+        {jobs.map((job, index) => {
+          // Convert BN values to numbers for rendering
+          const budget = bnToNumber(job.account.budget) /1000000000;
+          const createdAt = bnToNumber(job.account.createdAt);
+          const deadline = bnToNumber(job.account.deadline);
 
-            <div className="relative z-10">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-foreground mb-2 group-hover:text-neon-cyan transition-colors duration-300">
-                    {job.title}
-                  </h3>
-                  
-                  <div className="flex items-center space-x-4 text-sm text-foreground-muted mb-3">
-                    <div className="flex items-center space-x-1">
-                      <User className="w-4 h-4" />
-                      <span>{job.client}</span>
-                      {job.clientRating && (
-                        <div className="flex items-center space-x-1 ml-2">
-                          <Star className="w-3 h-3 text-neon-gold fill-neon-gold" />
-                          <span className="text-neon-gold">{job.clientRating}</span>
-                        </div>
-                      )}
+          return (
+            <motion.div
+              key={job.publicKey.toString()}
+              className="glass-panel p-5 rounded-xl hover-lift cursor-pointer relative overflow-hidden group"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1, duration: 0.6 }}
+              onMouseEnter={() => setHoveredJob(job.publicKey.toString())}
+              onMouseLeave={() => setHoveredJob(null)}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-foreground mb-2 group-hover:text-neon-cyan transition-colors duration-300">
+                      {job.account.title}
+                    </h3>
+                    
+                    <div className="flex items-center space-x-4 text-sm text-foreground-muted mb-3">
+                      <div className="flex items-center space-x-1">
+                        <User className="w-4 h-4" />
+                        <span className="font-mono text-xs">
+                          {job.account.client.toString().slice(0, 4)}...{job.account.client.toString().slice(-4)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center space-x-1">
+                        <Clock className="w-4 h-4" />
+                        <span>{formatDate(createdAt)}</span>
+                      </div>
+
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="w-4 h-4" />
+                        <span>Due: {formatDeadline(deadline)}</span>
+                      </div>
                     </div>
+
+                    <p className="text-foreground-muted text-sm mb-4 line-clamp-2">
+                      {job.account.description}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col items-end space-y-3 ml-4">
+                    <Badge className={`flex items-center gap-1 ${getStatusColor(job.account.status)}`}>
+                      {getStatusIcon(job.account.status)}
+                      {getStatusText(job.account.status)}
+                    </Badge>
+                    
+                    <div className="text-right">
+                      <div className="flex items-center text-neon-gold font-bold text-lg">
+                        <DollarSign className="w-4 h-4 mr-1" />
+                        {budget} SOL
+                      </div>
+                      <div className="text-xs text-foreground-muted mt-1">
+                        {job.account.freelancer ? "Assigned" : "Open for bids"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-glass-border">
+                  <div className="flex items-center space-x-4 text-sm text-foreground-muted">
+                    {isClient && (
+                      <div className="flex items-center space-x-1">
+                        <Eye className="w-4 h-4" />
+                        <span>0 bids</span>
+                      </div>
+                    )}
                     
                     <div className="flex items-center space-x-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{job.date}</span>
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Messages</span>
                     </div>
-
-                    {job.location && (
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="w-4 h-4" />
-                        <span>{job.location}</span>
-                      </div>
-                    )}
                   </div>
 
-                  <p className="text-foreground-muted text-sm mb-4 line-clamp-2">
-                    {job.description}
-                  </p>
-
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {job.skills.map((skill, skillIndex) => (
-                      <motion.div
-                        key={skillIndex}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: (index * 0.1) + (skillIndex * 0.05) + 0.3 }}
-                      >
-                        <Badge variant="outline" className="text-xs hover:bg-glass-secondary transition-colors">
-                          {skill}
-                        </Badge>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end space-y-3 ml-4">
-                  <Badge className={getStatusColor(job.status)}>
-                    {getStatusText(job.status)}
-                  </Badge>
-                  
-                  <div className="text-right">
-                    <div className="flex items-center text-neon-gold font-bold text-lg">
-                      <DollarSign className="w-4 h-4 mr-1" />
-                      {job.amount}
-                    </div>
-                    {job.deadline && (
-                      <div className="flex items-center text-xs text-foreground-muted mt-1">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {job.deadline}
-                      </div>
-                    )}
-                  </div>
+                  <motion.div
+                    className="flex space-x-2"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: hoveredJob === job.publicKey.toString() ? 1 : 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="hover:bg-gradient-primary hover:text-white"
+                      onClick={() => handleViewJob(job.publicKey)}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View
+                    </Button>
+                  </motion.div>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-glass-border">
-                <div className="flex items-center space-x-4 text-sm text-foreground-muted">
-                  {userRole === "client" && job.proposals && (
-                    <div className="flex items-center space-x-1">
-                      <Eye className="w-4 h-4" />
-                      <span>{job.proposals} proposals</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center space-x-1">
-                    <MessageCircle className="w-4 h-4" />
-                    <span>Messages</span>
-                  </div>
-                </div>
-
-                <motion.div
-                  className="flex space-x-2"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: hoveredJob === job.id ? 1 : 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Button size="sm" variant="outline" className="hover:bg-gradient-primary hover:text-white">
-                    <Eye className="w-3 h-3 mr-1" />
-                    View
-                  </Button>
-                  <Button size="sm" variant="outline" className="hover:bg-gradient-secondary hover:text-white">
-                    <ExternalLink className="w-3 h-3" />
-                  </Button>
-                </motion.div>
-              </div>
-            </div>
-
-            {/* Hover Border Effect */}
-            <motion.div
-              className="absolute inset-0 border border-transparent rounded-xl"
-              animate={{
-                borderColor: hoveredJob === job.id 
-                  ? "hsl(var(--neon-primary))" 
-                  : "transparent"
-              }}
-              transition={{ duration: 0.3 }}
-            />
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
     </motion.div>
   );

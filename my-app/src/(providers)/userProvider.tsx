@@ -6,6 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 import { getProgram, findUserPDA } from "@/(anchor)/setup";
 
 interface UserContextType {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any | null;
   isRegistered: boolean | null;
   loading: boolean;
@@ -20,6 +21,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const wallet = useWallet();
   
   const [loading, setLoading] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [user, setUser] = useState<any>(null);
   const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
 

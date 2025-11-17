@@ -5,7 +5,8 @@ import BN from 'bn.js';
 import BackendIdl from "./idl.json";
 
 type BackendProgram = typeof BackendIdl;
-
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    //@ts-expect-error
 const programAddress = BackendIdl.address || BackendIdl.metadata?.address;
 if (!programAddress) {
   throw new Error("Program address not found in IDL");
@@ -17,6 +18,7 @@ export const connection = new Connection(
   "confirmed"
 );
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getProgram = (wallet: any) => {
   // Validate wallet
   if (!wallet) {
@@ -72,6 +74,8 @@ export const findJobCounterPDA = () =>
       programId
     );
 // ✅ Types
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    //@ts-expect-error
 export type BackendAccounts = IdlAccounts<BackendProgram>;
 export type UserAccount = BackendAccounts["user"];
 export type JobAccount = BackendAccounts["job"];
