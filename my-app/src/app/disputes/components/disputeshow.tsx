@@ -248,19 +248,21 @@ const DisputeDetailPage = () => {
             endDate: new Date(jobData.account.dispute.votingEnd.toNumber() * 1000).toISOString(),
           },
           evidence: [
-            {
+            // Freelancer's work submission
+            ...(jobData.account.workSubmitted ? [{
               id: "ev-001",
-              submittedBy: "freelancer",
-              description: jobData.account.workSubmissionDescription || "Complete work delivery proof with timestamps and verification documents.",
+              submittedBy: "freelancer" as const,
+              description: jobData.account.workSubmissionDescription || "Work submission with deliverables",
               attachments: jobData.account.workSubmissionUrl ? [jobData.account.workSubmissionUrl] : [],
               submittedDate: jobData.account.workSubmittedAt 
                 ? new Date(jobData.account.workSubmittedAt.toNumber() * 1000).toISOString()
-                : new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-            },
+                : new Date().toISOString(),
+            }] : []),
+            // Client's dispute reason
             {
               id: "ev-002",
-              submittedBy: "client",
-              description: jobData.account.dispute?.reason || "Quality concerns and incomplete delivery evidence.",
+              submittedBy: "client" as const,
+              description: jobData.account.dispute?.reason || "Dispute raised regarding work quality or completion",
               attachments: [],
               submittedDate: new Date(jobData.account.dispute?.createdAt?.toNumber() * 1000 || Date.now()).toISOString(),
             },
@@ -591,16 +593,7 @@ const DisputeDetailPage = () => {
         setFinalizing(false);
       }
     };
-
-    const votingEndTime = dispute.dispute.votingEnd?.toNumber() || 0;
-    const currentTime = Math.floor(Date.now() / 1000);
-    const votingEnded = currentTime >= votingEndTime;
-    const isVotingStatus = dispute.dispute.status?.voting !== undefined;
-    const isResolved = dispute.dispute.status?.resolved !== undefined;
-    const isRejected = dispute.dispute.status?.rejected !== undefined;
-
     
-    // Show finalize button only when voting has ended and dispute is still in voting status
     return (
       <Button 
         variant="neon" 
@@ -806,7 +799,8 @@ const DisputeDetailPage = () => {
                   <CardHeader>
                     <TabsList className="grid w-full grid-cols-3 bg-glass-secondary">
                       <TabsTrigger value="details">Details</TabsTrigger>
-                      <TabsTrigger value="evidence">Evidence</TabsTrigger>
+                     
+                      <TabsTrigger value="work">Work Submission</TabsTrigger>
                       <TabsTrigger value="timeline">Timeline</TabsTrigger>
                     </TabsList>
                   </CardHeader>
@@ -860,32 +854,119 @@ const DisputeDetailPage = () => {
                                   : "bg-neon-purple/10 text-neon-purple border-neon-purple/30"
                               }
                             >
-                              {evidence.submittedBy === "client" ? "Client" : "Freelancer"}
+                              {evidence.submittedBy === "client" ? "Client Evidence" : "Freelancer Evidence"}
                             </Badge>
-                            <span className="text-xs text-foreground-muted">
+                            <span className="text-xs text-foreground-muted flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
                               {new Date(evidence.submittedDate).toLocaleDateString()}
                             </span>
                           </div>
                           <p className="text-sm text-foreground">{evidence.description}</p>
                           {evidence.attachments.length > 0 && (
                             <div className="space-y-2">
-                              <div className="text-xs font-semibold text-foreground-muted">Attachments:</div>
+                              <div className="text-xs font-semibold text-foreground-muted flex items-center gap-1">
+                                <Paperclip className="h-3 w-3" />
+                                Attachments:
+                              </div>
                               <div className="flex flex-wrap gap-2">
                                 {evidence.attachments.map((attachment, idx) => (
-                                  <Badge
+                                  <a
                                     key={idx}
-                                    variant="outline"
-                                    className="glass-panel hover:bg-neon-cyan/10 hover:border-neon-cyan/30 cursor-pointer transition-colors"
+                                    href={attachment}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="group"
                                   >
-                                    <Paperclip className="h-3 w-3 mr-1" />
-                                    {attachment}
-                                  </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className="glass-panel hover:bg-neon-cyan/10 hover:border-neon-cyan/30 cursor-pointer transition-colors"
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1 group-hover:scale-110 transition-transform" />
+                                      View Attachment {idx + 1}
+                                    </Badge>
+                                  </a>
                                 ))}
                               </div>
                             </div>
                           )}
                         </motion.div>
                       ))}
+
+                      {dispute.evidence.length === 0 && (
+                        <div className="text-center py-8">
+                          <FileText className="h-12 w-12 text-foreground-muted mx-auto mb-3 opacity-50" />
+                          <p className="text-foreground-muted">No evidence has been submitted yet</p>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="work" className="space-y-4">
+                      {dispute.workSubmission.submitted ? (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 rounded-lg bg-gradient-to-br from-neon-purple/10 to-neon-cyan/10 border border-neon-purple/30 space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Upload className="h-5 w-5 text-neon-purple" />
+                              <span className="font-semibold text-foreground">Work Submission</span>
+                            </div>
+                            <Badge variant="outline" className="bg-neon-purple/10 text-neon-purple border-neon-purple/30">
+                              Freelancer
+                            </Badge>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="text-sm text-foreground-muted">
+                              <strong>Description:</strong>
+                            </div>
+                            <p className="text-sm text-foreground bg-glass-secondary p-3 rounded-lg">
+                              {dispute.workSubmission.description || "Work has been completed and submitted for review"}
+                            </p>
+                          </div>
+
+                          {dispute.workSubmission.url && (
+                            <div className="space-y-2">
+                              <div className="text-sm text-foreground-muted">
+                                <strong>Deliverable Link:</strong>
+                              </div>
+                              <a 
+                                href={dispute.workSubmission.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-sm text-neon-cyan hover:text-neon-cyan/80 transition-colors p-3 bg-glass-secondary rounded-lg group"
+                              >
+                                <ExternalLink className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                                <span className="break-all">{dispute.workSubmission.url}</span>
+                              </a>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-xs text-foreground-muted pt-2 border-t border-glass-border">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-3 w-3" />
+                              Submitted: {dispute.workSubmission.submittedAt 
+                                ? new Date(dispute.workSubmission.submittedAt).toLocaleDateString()
+                                : "N/A"}
+                            </div>
+                            <Badge 
+                              variant="outline"
+                              className={dispute.workSubmission.approved 
+                                ? "bg-green-500/10 text-green-500 border-green-500/30"
+                                : "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
+                              }
+                            >
+                              {dispute.workSubmission.approved ? "Approved" : "Pending Review"}
+                            </Badge>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Upload className="h-12 w-12 text-foreground-muted mx-auto mb-3 opacity-50" />
+                          <p className="text-foreground-muted">No work has been submitted yet</p>
+                        </div>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="timeline" className="space-y-4">
@@ -896,52 +977,51 @@ const DisputeDetailPage = () => {
               </Card>
             </motion.div>
 
-            {/* Action Buttons - Show Vote button during voting period, Finalize after */}
+            {/* Action Buttons - Show based on time only */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-4"
             >
-              {/* Show Vote Button during voting period */}
-              {dispute.dispute.status?.voting && !verdict?.isResolved && !verdict?.isRejected && (
-                (() => {
-                  const votingEndTime = dispute.dispute.votingEnd?.toNumber() || 0;
-                  const currentTime = Math.floor(Date.now() / 1000);
-                  const votingActive = currentTime < votingEndTime;
-                  
-                  if (votingActive) {
-                    return (
-                      <Button 
-                        variant="neon" 
-                        className="flex-1 group"
-                        onClick={() => setVotingDialogOpen(true)}
-                      >
-                        <Vote className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
-                        Cast Your Vote
-                        <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    );
-                  }
-                  return null;
-                })()
-              )}
-
-              {/* Show Finalize Button after voting period ends */}
-              <FinalizeDisputeButton />
-
-              {/* Show message if dispute is resolved */}
-              {(verdict?.isResolved || verdict?.isRejected) && (
-                <div className="flex-1 p-4 rounded-lg bg-green-500/10 border border-green-500/20 text-center">
-                  <CheckCircle2 className="h-6 w-6 text-green-500 mx-auto mb-2" />
-                  <div className="font-semibold text-foreground">Dispute Resolved</div>
-                  <div className="text-sm text-foreground-muted">
-                    This dispute has been {verdict.isResolved ? 'resolved' : 'rejected'}
-                  </div>
-                </div>
-              )}
-
-              
+              {(() => {
+                const votingEndTime = dispute.dispute.votingEnd?.toNumber() || 0;
+                const currentTime = Math.floor(Date.now() / 1000);
+                const votingActive = currentTime < votingEndTime;
+                const isResolved = dispute.dispute.status?.resolved !== undefined;
+                const isRejected = dispute.dispute.status?.rejected !== undefined;
+                
+                // Show resolved message if dispute is finalized
+                if (isResolved || isRejected) {
+                  return (
+                    <div className="flex-1 p-4 rounded-lg bg-green-500/10 border border-green-500/20 text-center">
+                      <CheckCircle2 className="h-6 w-6 text-green-500 mx-auto mb-2" />
+                      <div className="font-semibold text-foreground">Dispute {isResolved ? 'Resolved' : 'Rejected'}</div>
+                      <div className="text-sm text-foreground-muted">
+                        This dispute has been finalized
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Show voting button if voting period is active
+                if (votingActive) {
+                  return (
+                    <Button 
+                      variant="neon" 
+                      className="flex-1 group"
+                      onClick={() => setVotingDialogOpen(true)}
+                    >
+                      <Vote className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
+                      Cast Your Vote
+                      <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  );
+                }
+                
+                // Show finalize button if voting has ended but not yet finalized
+                return <FinalizeDisputeButton />;
+              })()}
             </motion.div>
           </div>
         </div>
