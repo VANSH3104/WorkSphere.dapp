@@ -429,19 +429,6 @@ netlify deploy
 
 ---
 
-## 🗺️ Roadmap
-
-- [ ] **Phase 1**: Core marketplace functionality ✅
-- [ ] **Phase 2**: Enhanced dispute resolution
-- [ ] **Phase 3**: Reputation system & reviews
-- [ ] **Phase 4**: Multi-token payment support (USDC, USDT)
-- [ ] **Phase 5**: DAO governance for disputes
-- [ ] **Phase 6**: Mobile app (React Native)
-- [ ] **Phase 7**: Advanced analytics & insights
-- [ ] **Phase 8**: Integration with other platforms
-
----
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -454,15 +441,12 @@ Contributions are welcome! Please follow these steps:
 
 ---
 
-## 📄 License
-
-This project is licensed under the ISC License.
-
----
 
 ## 👥 Team
 
-<!-- Add team member information here -->
+Nikhil Dhakad: https://github.com/nikhil-dtech , https://www.linkedin.com/in/nikhil-dhakad-46304b285/
+Nikhil Goyal: https://github.com/NikhilG-14 ,  https://www.linkedin.com/in/nikhil-goyal-baa177325/
+vansh Kabra: https://github.com/VANSH3104 , https://www.linkedin.com/in/vansh-kabra-0a110327b/
 
 ---
 
@@ -470,7 +454,7 @@ This project is licensed under the ISC License.
 
 For questions or support, please:
 - Open an issue on GitHub
-- Contact the development team
+- Contact on linkedin or github
 
 ---
 
