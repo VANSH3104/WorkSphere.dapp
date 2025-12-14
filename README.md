@@ -7,21 +7,35 @@ A blockchain-based freelance marketplace built on Solana, enabling trustless job
 ## 📸 Screenshots
 
 <!-- Add screenshots here -->
+### Homepage
+<img width="1467" height="744" alt="2025-12-14_12-13-05" src="https://github.com/user-attachments/assets/ec13e5b8-9757-4521-a167-9e9f2549e15e" />
 
 ### Dashboard
-![Dashboard](path/to/dashboard-screenshot.png)
+<img width="1462" height="831" alt="2025-12-14_12-15-27" src="https://github.com/user-attachments/assets/f1dcdf00-89b9-411f-a53e-d172f47d23bd" />
+<img width="1469" height="830" alt="2025-12-14_12-15-56" src="https://github.com/user-attachments/assets/a20ff4a2-c298-4191-ad29-5a63c7d71814" />
+<img width="1160" height="818" alt="2025-12-14_12-18-00" src="https://github.com/user-attachments/assets/c248fe15-6285-407e-93a2-9216a800f115" />
+
 
 ### Job Listing
-![Job Listing](path/to/job-listing-screenshot.png)
+<img width="1386" height="828" alt="2025-12-14_12-16-30" src="https://github.com/user-attachments/assets/2136b250-bb68-48ca-9372-32b504acf456" />
+
+<img width="1139" height="767" alt="2025-12-14_12-16-51" src="https://github.com/user-attachments/assets/73ebb074-8fd6-4b7c-9013-df6461118768" />
+
+
+
 
 ### Job Creation
-![Job Creation](path/to/job-creation-screenshot.png)
+<img width="1145" height="810" alt="2025-12-14_12-18-56" src="https://github.com/user-attachments/assets/6e3c684e-d803-4bed-a1eb-e63da9204dd8" />
+
 
 ### Proposal Management
-![Proposal Management](path/to/proposal-management-screenshot.png)
+<img width="1195" height="817" alt="2025-12-14_12-18-32" src="https://github.com/user-attachments/assets/ba9151ae-06de-46e2-a05e-97d76c4dca30" />
 
 ### Dispute Resolution
-![Dispute Resolution](path/to/dispute-resolution-screenshot.png)
+<img width="1186" height="794" alt="2025-12-14_12-19-18" src="https://github.com/user-attachments/assets/4addea2a-c4de-41e5-ac44-66b8ce0a8f48" />
+<img width="1218" height="823" alt="2025-12-14_12-19-53" src="https://github.com/user-attachments/assets/07132d95-2b55-4ea4-8820-97203e1d5e2b" />
+
+
 
 ---
 
@@ -241,6 +255,7 @@ If there's a disagreement:
    - PDA: `["escrow", job_account]`
 
 ### Job Lifecycle
+<img width="608" height="292" alt="image" src="https://github.com/user-attachments/assets/2f6d51f2-a58b-4d55-88e9-71453146ef15" />
 
 ```
 ┌─────────┐     ┌──────────┐     ┌───────────┐     ┌───────────┐
