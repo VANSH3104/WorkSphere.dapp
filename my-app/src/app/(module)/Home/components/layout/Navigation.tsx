@@ -60,7 +60,7 @@
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center space-x-4">
               <Button variant="glass" size="sm" asChild>
-                <Link href="/onboarding">Launch App</Link>
+                <Link href="/jobs">Launch App</Link>
               </Button>
               
               {/* Wallet Connect Button */}
@@ -108,7 +108,7 @@
                 
                 <div className="pt-4 space-y-3 border-t border-glass-border">
                   <Button variant="glass" size="sm" className="w-full" asChild>
-                    <Link href="/onboarding">Launch App</Link>
+                    <Link href="/jobs">Launch App</Link>
                   </Button>
                   
                   {/* Mobile Wallet Connect */}

@@ -19,6 +19,7 @@ function Calendar({
       return props.month as Date;
     }
     if ("selected" in props) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sel = (props as any).selected;
       if (Array.isArray(sel)) {
         return (sel[0] as Date) ?? new Date();
@@ -27,25 +28,25 @@ function Calendar({
     }
     return new Date();
   });
-  
+
   const handlePreviousYear = () => {
     const newDate = new Date(month);
     newDate.setFullYear(newDate.getFullYear() - 1);
     setMonth(newDate);
   };
-  
+
   const handleNextYear = () => {
     const newDate = new Date(month);
     newDate.setFullYear(newDate.getFullYear() + 1);
     setMonth(newDate);
   };
-  
+
   const handlePreviousMonth = () => {
     const newDate = new Date(month);
     newDate.setMonth(newDate.getMonth() - 1);
     setMonth(newDate);
   };
-  
+
   const handleNextMonth = () => {
     const newDate = new Date(month);
     newDate.setMonth(newDate.getMonth() + 1);
@@ -64,7 +65,7 @@ function Calendar({
         >
           <ChevronsLeft className="h-4 w-4 text-foreground-muted" />
         </button>
-        
+
         <button
           onClick={handlePreviousMonth}
           className="p-2 hover:bg-accent rounded-md transition-colors"
@@ -73,7 +74,7 @@ function Calendar({
         >
           <ChevronLeft className="h-4 w-4 text-foreground-muted" />
         </button>
-        
+
         <div className="text-center flex-1">
           <div className="text-lg font-semibold text-foreground">
             {month.toLocaleDateString('en-US', { month: 'long' })}
@@ -82,7 +83,7 @@ function Calendar({
             {month.getFullYear()}
           </div>
         </div>
-        
+
         <button
           onClick={handleNextMonth}
           className="p-2 hover:bg-accent rounded-md transition-colors"
@@ -91,7 +92,7 @@ function Calendar({
         >
           <ChevronRight className="h-4 w-4 text-foreground-muted" />
         </button>
-        
+
         <button
           onClick={handleNextYear}
           className="p-2 hover:bg-accent rounded-md transition-colors"

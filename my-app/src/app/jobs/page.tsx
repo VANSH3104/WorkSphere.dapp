@@ -1,12 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion } from "framer-motion";
-import { 
-  Search, 
-  SlidersHorizontal, 
-  Grid3x3, 
-  List, 
-  Clock, 
+import {
+  Search,
+  SlidersHorizontal,
+  Grid3x3,
+  List,
+  Clock,
   DollarSign,
   Briefcase,
   TrendingUp,
@@ -49,7 +49,7 @@ const JobListingPage = () => {
   const navigate = useRouter();
   const searchParams = useSearchParams();
   const { wallet } = useWallet();
-  
+
   const userRole = searchParams.get("role") || "freelancer";
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,7 +99,7 @@ const JobListingPage = () => {
 
   // Format budget display
   const formatBudget = (budget: number) => {
-    const budgetlamp = budget/1000000000
+    const budgetlamp = budget / 1000000000
     return `${budgetlamp} SOL`;
   };
 
@@ -107,7 +107,7 @@ const JobListingPage = () => {
   const formatRelativeTime = (timestamp: number) => {
     const now = Math.floor(Date.now() / 1000);
     const diff = now - timestamp;
-    
+
     if (diff < 60) return "Just now";
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
@@ -137,7 +137,7 @@ const JobListingPage = () => {
   // Filter jobs based on time
   const filterJobsByTime = (jobs: Job[], filter: TimeFilter) => {
     const now = Math.floor(Date.now() / 1000);
-    
+
     switch (filter) {
       case "latest":
         return jobs.sort((a, b) => b.account.createdAt - a.account.createdAt).slice(0, 10);
@@ -174,11 +174,11 @@ const JobListingPage = () => {
     if (job.account.skills && Array.isArray(job.account.skills) && job.account.skills.length > 0) {
       return job.account.skills;
     }
-    
+
     // Fallback: extract from description if skills array is empty
     const description = job.account.description.toLowerCase();
     const commonSkills = ["React", "TypeScript", "Solana", "Rust", "Python", "Node.js"];
-    return commonSkills.filter(skill => 
+    return commonSkills.filter(skill =>
       description.includes(skill.toLowerCase())
     ).slice(0, 3);
   };
@@ -189,7 +189,7 @@ const JobListingPage = () => {
     if (job.account.category && job.account.category !== "other") {
       return job.account.category;
     }
-    
+
     // Fallback: extract from description if category is not set
     const description = job.account.description.toLowerCase();
     const title = job.account.title.toLowerCase();
@@ -197,8 +197,8 @@ const JobListingPage = () => {
 
     // Blockchain & Web3
     if (
-      text.includes("web3") || 
-      text.includes("blockchain") || 
+      text.includes("web3") ||
+      text.includes("blockchain") ||
       text.includes("solana") ||
       text.includes("smart contract") ||
       text.includes("defi") ||
@@ -213,8 +213,8 @@ const JobListingPage = () => {
 
     // Web Development
     if (
-      text.includes("react") || 
-      text.includes("typescript") || 
+      text.includes("react") ||
+      text.includes("typescript") ||
       text.includes("web") && text.includes("develop") ||
       text.includes("frontend") ||
       text.includes("backend") ||
@@ -229,8 +229,8 @@ const JobListingPage = () => {
 
     // Mobile Development
     if (
-      text.includes("mobile") || 
-      text.includes("ios") || 
+      text.includes("mobile") ||
+      text.includes("ios") ||
       text.includes("android") ||
       text.includes("react native") ||
       text.includes("flutter") ||
@@ -241,8 +241,8 @@ const JobListingPage = () => {
 
     // Design & Creative
     if (
-      text.includes("design") || 
-      text.includes("figma") || 
+      text.includes("design") ||
+      text.includes("figma") ||
       text.includes("ui") ||
       text.includes("ux") ||
       text.includes("user interface") ||
@@ -257,8 +257,8 @@ const JobListingPage = () => {
 
     // Writing & Content
     if (
-      text.includes("writing") || 
-      text.includes("content") || 
+      text.includes("writing") ||
+      text.includes("content") ||
       text.includes("copy") ||
       text.includes("article") ||
       text.includes("blog") ||
@@ -271,8 +271,8 @@ const JobListingPage = () => {
 
     // Marketing & Sales
     if (
-      text.includes("marketing") || 
-      text.includes("sales") || 
+      text.includes("marketing") ||
+      text.includes("sales") ||
       text.includes("seo") ||
       text.includes("social media") ||
       text.includes("digital marketing") ||
@@ -286,8 +286,8 @@ const JobListingPage = () => {
 
     // Data & Analytics
     if (
-      text.includes("data") || 
-      text.includes("analytics") || 
+      text.includes("data") ||
+      text.includes("analytics") ||
       text.includes("sql") ||
       text.includes("database") ||
       text.includes("data analysis") ||
@@ -300,8 +300,8 @@ const JobListingPage = () => {
 
     // AI & Machine Learning
     if (
-      text.includes("ai") || 
-      text.includes("machine learning") || 
+      text.includes("ai") ||
+      text.includes("machine learning") ||
       text.includes("artificial intelligence") ||
       text.includes("neural network") ||
       text.includes("deep learning") ||
@@ -319,21 +319,21 @@ const JobListingPage = () => {
   // Filter jobs based on search query, categories, and skills
   const filteredJobs = jobs.filter(job => {
     // Text search
-    const matchesSearch = 
+    const matchesSearch =
       job.account.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.account.description.toLowerCase().includes(searchQuery.toLowerCase());
 
     // Category filter - use actual category from account with fallback
-    const jobCategory = job.account.category && job.account.category !== "other" 
-      ? job.account.category 
+    const jobCategory = job.account.category && job.account.category !== "other"
+      ? job.account.category
       : extractCategoryFromJob(job);
     const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(jobCategory);
 
     // Skills filter - use actual skills from account with fallback
-    const jobSkills = job.account.skills && job.account.skills.length > 0 
-      ? job.account.skills 
+    const jobSkills = job.account.skills && job.account.skills.length > 0
+      ? job.account.skills
       : extractSkillsFromJob(job);
-    const matchesSkills = selectedSkills.length === 0 || 
+    const matchesSkills = selectedSkills.length === 0 ||
       selectedSkills.some(skill => jobSkills.includes(skill));
 
     return matchesSearch && matchesCategory && matchesSkills;
@@ -421,8 +421,8 @@ const JobListingPage = () => {
             </span>
           </h1>
           <p className="text-foreground-muted text-lg">
-            {userRole === "client" 
-              ? "Manage your posted projects and review proposals" 
+            {userRole === "client"
+              ? "Manage your posted projects and review proposals"
               : "Find the perfect project or freelancer opportunity"}
           </p>
         </motion.div>
@@ -447,8 +447,8 @@ const JobListingPage = () => {
             </div>
 
             {/* Advanced Filters Toggle */}
-            <Button 
-              variant="glass" 
+            <Button
+              variant="glass"
               className="gap-2 h-12"
               onClick={() => setShowFilters(!showFilters)}
             >
@@ -498,8 +498,8 @@ const JobListingPage = () => {
               {selectedCategories.map(category => (
                 <Badge key={category} variant="outline" className="bg-primary/20 text-primary border-primary/30">
                   {category}
-                  <X 
-                    className="h-3 w-3 ml-1 cursor-pointer" 
+                  <X
+                    className="h-3 w-3 ml-1 cursor-pointer"
                     onClick={() => toggleCategory(category)}
                   />
                 </Badge>
@@ -507,8 +507,8 @@ const JobListingPage = () => {
               {selectedSkills.map(skill => (
                 <Badge key={skill} variant="outline" className="bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30">
                   {skill}
-                  <X 
-                    className="h-3 w-3 ml-1 cursor-pointer" 
+                  <X
+                    className="h-3 w-3 ml-1 cursor-pointer"
                     onClick={() => toggleSkill(skill)}
                   />
                 </Badge>
@@ -643,7 +643,7 @@ const JobListingPage = () => {
             {selectedSkills.length > 0 && ` • Skills: ${selectedSkills.length}`}
             {searchQuery && ` • Search: "${searchQuery}"`}
           </p>
-          
+
           <div className="flex items-center gap-2 text-sm text-foreground-muted">
             <ArrowUpDown className="h-4 w-4" />
             <span>Sorted by: {getSortLabel(sortOption)}</span>
@@ -662,15 +662,15 @@ const JobListingPage = () => {
               No jobs found
             </h3>
             <p className="text-foreground-muted mb-6">
-              {searchQuery 
+              {searchQuery
                 ? `No jobs match your search for "${searchQuery}"`
                 : selectedCategories.length > 0 || selectedSkills.length > 0
-                ? "No jobs match your selected filters"
-                : statusFilter !== 'all'
-                ? `No ${statusFilter} jobs available`
-                : timeFilter !== 'all'
-                ? `No jobs posted in the ${getTimeFilterLabel(timeFilter).toLowerCase()}`
-                : "No jobs available at the moment"}
+                  ? "No jobs match your selected filters"
+                  : statusFilter !== 'all'
+                    ? `No ${statusFilter} jobs available`
+                    : timeFilter !== 'all'
+                      ? `No jobs posted in the ${getTimeFilterLabel(timeFilter).toLowerCase()}`
+                      : "No jobs available at the moment"}
             </p>
             <div className="flex gap-3 justify-center">
               <Button
@@ -695,8 +695,8 @@ const JobListingPage = () => {
               const jobStatus = formatJobStatus(job.account.status);
               const postedDate = formatRelativeTime(job.account.createdAt);
               const mockProposals = job.account.bidders?.length || 0;
-              const jobSkills = job.account.skills && job.account.skills.length > 0 
-                ? job.account.skills 
+              const jobSkills = job.account.skills && job.account.skills.length > 0
+                ? job.account.skills
                 : extractSkillsFromJob(job);
               const jobCategory = job.account.category && job.account.category !== "other"
                 ? job.account.category
@@ -719,11 +719,11 @@ const JobListingPage = () => {
                         {job.account.title}
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-foreground-muted">
-                        
-                          <Badge variant="outline" className="text-xs border-green-500/30 text-green-500">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Verified
-                          </Badge>
+
+                        <Badge variant="outline" className="text-xs border-green-500/30 text-green-500">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
                         <div className="flex items-center gap-1 text-neon-gold">
                         </div>
                         <div className="flex items-center gap-1 text-foreground-muted">
@@ -781,7 +781,7 @@ const JobListingPage = () => {
                     <div className="text-xs text-foreground-muted">
                       Job ID: {job.account.jobId.toString()}
                     </div>
-                    
+
                     <div className="text-xs text-foreground-muted">
                       {job.account.client.toString().slice(0, 8)}...
                     </div>
@@ -797,6 +797,13 @@ const JobListingPage = () => {
       </div>
     </div>
   );
-};
+}
 
-export default JobListingPage;
+// Wrap with Suspense for useSearchParams
+export default function JobsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <JobListingPage />
+    </Suspense>
+  );
+}

@@ -10,21 +10,25 @@ export function WalletProtected({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(false);
-  
-  
+
+  // Public routes that don't require wallet connection
+  const publicRoutes = ['/', '/jobs'];
+  const isPublicRoute = publicRoutes.includes(pathname) || pathname.startsWith('/jobs/');
+
   useEffect(() => {
-    if (!connected && pathname !== '/') {
+    // Only redirect if not connected and not on a public route
+    if (!connected && !isPublicRoute) {
       setIsRedirecting(true);
       // Small delay to show the redirect UI
       const timer = setTimeout(() => {
         router.push('/');
         setIsRedirecting(false);
       }, 1000);
-      
+
       return () => clearTimeout(timer);
     }
-  }, [connected, pathname, router]);
-  
+  }, [connected, pathname, router, isPublicRoute]);
+
   // Show redirect UI when redirecting
   if (isRedirecting && !connected) {
     return (
@@ -46,11 +50,11 @@ export function WalletProtected({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  
-  // Only render children if wallet is connected or on home page
-  if (!connected && pathname !== '/') {
+
+  // Only render children if wallet is connected or on a public route
+  if (!connected && !isPublicRoute) {
     return null;
   }
-  
+
   return <>{children}</>;
 }

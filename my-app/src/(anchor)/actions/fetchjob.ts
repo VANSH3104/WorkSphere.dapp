@@ -49,15 +49,15 @@ export const fetchJobs = async (
       limit
     } = options;
 
-    if (!wallet.publicKey) {
-      throw new Error('Wallet not connected');
-    }
+    // if (!wallet.publicKey) {
+    //   throw new Error('Wallet not connected');
+    // }
 
     const program = getProgram(wallet);
-    
+
     // Step 1: Build filters based on options
     const filters = [];
-    
+
     // Client filter - only add if specified
     if (clientFilter !== 'all') {
       const clientAddress = clientFilter === 'my' ? wallet.publicKey : clientFilter;
@@ -68,22 +68,22 @@ export const fetchJobs = async (
         }
       });
     }
-    
+
     let jobs;
     if (filters.length > 0) {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    //@ts-expect-error
+      //@ts-expect-error
       jobs = await program.account.job.all(filters);
     } else {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    //@ts-expect-error
+      //@ts-expect-error
       jobs = await program.account.job.all();
     }
-    
+
     // Step 3: Apply freelancer filter (client-side)
     if (freelancerFilter !== 'all') {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    //@ts-expect-error
+      //@ts-expect-error
       jobs = jobs.filter(job => {
         // Check if freelancer is assigned and matches
         if (job.account.freelancer) {
@@ -96,22 +96,22 @@ export const fetchJobs = async (
         return false;
       });
     }
-    
+
     // Step 4: Apply status filter (client-side)
     if (statusFilter !== 'all') {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    //@ts-expect-error
+      //@ts-expect-error
       jobs = jobs.filter(job => {
         const jobStatus = Object.keys(job.account.status)[0].toLowerCase();
         return jobStatus === statusFilter.toLowerCase();
       });
     }
-    
+
     // Step 5: Apply limit if specified
     if (limit && limit > 0) {
       jobs = jobs.slice(0, limit);
     }
-    
+
     // Return clean job data
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-expect-error
@@ -119,7 +119,7 @@ export const fetchJobs = async (
       publicKey: job.publicKey,
       account: job.account
     }));
-    
+
   } catch (error) {
     console.error("❌ Error fetching jobs:", error);
     throw error;
@@ -136,7 +136,7 @@ export const fetchJobByPublicKey = async (
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-expect-error
     const jobAccount = await program.account.job.fetch(jobPublicKey);
-    
+
     return {
       publicKey: jobPublicKey,
       account: jobAccount
@@ -191,12 +191,12 @@ export const fetchJobsWithFreelancerBids = async (
     }
 
     const program = getProgram(wallet);
-    
+
     // Fetch all jobs (or filter by status if needed)
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-expect-error
     let jobs = await program.account.job.all();
-    
+
     // Filter jobs where freelancer has bid
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-expect-error
@@ -216,7 +216,7 @@ export const fetchJobsWithFreelancerBids = async (
           }
         });
       }
-      
+
       // Or check if freelancer is assigned
       if (job.account.freelancer) {
         try {
@@ -225,14 +225,14 @@ export const fetchJobsWithFreelancerBids = async (
           return false;
         }
       }
-      
+
       return false;
     });
-    
+
     // Apply status filter
     if (statusFilter !== 'all') {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    //@ts-expect-error
+      //@ts-expect-error
       jobs = jobs.filter(job => {
         const jobStatus = Object.keys(job.account.status)[0].toLowerCase();
         return jobStatus === statusFilter.toLowerCase();
@@ -244,7 +244,7 @@ export const fetchJobsWithFreelancerBids = async (
       publicKey: job.publicKey,
       account: job.account
     }));
-    
+
   } catch (error) {
     console.error("❌ Error fetching jobs with freelancer bids:", error);
     throw error;
