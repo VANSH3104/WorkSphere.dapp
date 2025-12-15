@@ -444,9 +444,9 @@ Contributions are welcome! Please follow these steps:
 
 ## 👥 Team
 
-Nikhil Dhakad: https://github.com/nikhil-dtech , https://www.linkedin.com/in/nikhil-dhakad-46304b285/
-Nikhil Goyal: https://github.com/NikhilG-14 ,  https://www.linkedin.com/in/nikhil-goyal-baa177325/
-vansh Kabra: https://github.com/VANSH3104 , https://www.linkedin.com/in/vansh-kabra-0a110327b/
+- Nikhil Dhakad: https://github.com/nikhil-dtech , https://www.linkedin.com/in/nikhil-dhakad-46304b285/
+- Nikhil Goyal: https://github.com/NikhilG-14 ,  https://www.linkedin.com/in/nikhil-goyal-baa177325/
+- vansh Kabra: https://github.com/VANSH3104 , https://www.linkedin.com/in/vansh-kabra-0a110327b/
 
 ---
 
